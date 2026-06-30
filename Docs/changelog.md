@@ -2,6 +2,11 @@
 
 ## 2026-06-30
 
+- 拆分 `Module/charge_manager.c` 内部实现，新增 `charge_manager_params.inc`、`charge_manager_path.inc`、`charge_manager_faults.inc`、`charge_manager_control.inc`、`charge_manager_commands.inc`。
+- 保留 `charge_manager.c` 作为外观入口和主状态机文件，外部 API 不变。
+- 新增 `Docs/charge_manager_split_design.md`，记录拆分原因、边界和测试方式。
+- 更新 Keil 工程 Module 分组，使内部实现片段可见但不作为独立编译单元。
+- 更新 `Tests/run_tests.py`，检查 charge manager 内部分片存在且包含顺序正确。
 - 新增 `Docs`、`Tests`、`App`、`BSP`、`Common`、`Config`、`Module`、`Service` 目录。
 - 将任务编排从 `Driver` 移到 `App`。
 - 将板级支持和 UART BSP 代码从 `Driver`/`Comm` 移到 `BSP`。

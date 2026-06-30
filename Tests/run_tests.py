@@ -30,6 +30,11 @@ EXPECTED_FILES = [
     "Driver/power_control.c",
     "Module/balance_manager.c",
     "Module/charge_manager.c",
+    "Module/charge_manager_commands.inc",
+    "Module/charge_manager_control.inc",
+    "Module/charge_manager_faults.inc",
+    "Module/charge_manager_params.inc",
+    "Module/charge_manager_path.inc",
     "Module/power_manager.c",
     "Module/power_path_manager.c",
     "Module/soc_estimator.c",
@@ -39,6 +44,14 @@ EXPECTED_FILES = [
     "Service/fault_log.c",
     "Service/param_storage.c",
     "Service/safety_manager.c",
+]
+
+CHARGE_MANAGER_FRAGMENTS = [
+    'charge_manager_params.inc',
+    'charge_manager_path.inc',
+    'charge_manager_faults.inc',
+    'charge_manager_control.inc',
+    'charge_manager_commands.inc',
 ]
 
 MOVED_OLD_PATHS = [
@@ -133,6 +146,19 @@ def assert_keil_uses_layers() -> None:
             fail(f"Keil project still references old moved path: {token}")
 
 
+def assert_charge_manager_fragments() -> None:
+    source = (FW / "Module" / "charge_manager.c").read_text(encoding="utf-8")
+    last_index = -1
+    for fragment in CHARGE_MANAGER_FRAGMENTS:
+        token = f'#include "{fragment}"'
+        index = source.find(token)
+        if index < 0:
+            fail(f"charge_manager.c missing internal fragment include: {fragment}")
+        if index <= last_index:
+            fail(f"charge_manager internal fragment order is wrong near: {fragment}")
+        last_index = index
+
+
 def find_c_compiler() -> str | None:
     for compiler in ("gcc", "clang", "cl"):
         found = shutil.which(compiler)
@@ -183,6 +209,7 @@ def main() -> int:
         ("old moved paths removed", assert_old_paths_not_present),
         ("Keil FilePath entries resolve", assert_keil_paths_resolve),
         ("Keil include paths use layers", assert_keil_uses_layers),
+        ("charge manager fragments included", assert_charge_manager_fragments),
     ]
 
     for name, check in checks:

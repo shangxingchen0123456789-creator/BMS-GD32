@@ -760,6 +760,31 @@
               <FilePath>..\Module\charge_manager.h</FilePath>
             </File>
             <File>
+              <FileName>charge_manager_params.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Module\charge_manager_params.inc</FilePath>
+            </File>
+            <File>
+              <FileName>charge_manager_path.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Module\charge_manager_path.inc</FilePath>
+            </File>
+            <File>
+              <FileName>charge_manager_faults.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Module\charge_manager_faults.inc</FilePath>
+            </File>
+            <File>
+              <FileName>charge_manager_control.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Module\charge_manager_control.inc</FilePath>
+            </File>
+            <File>
+              <FileName>charge_manager_commands.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Module\charge_manager_commands.inc</FilePath>
+            </File>
+            <File>
               <FileName>power_manager.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Module\power_manager.c</FilePath>
