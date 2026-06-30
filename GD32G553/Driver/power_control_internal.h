@@ -74,27 +74,6 @@ typedef struct {
 
 extern power_control_context_t g_power_control;
 
-#define s_power                             (g_power_control.power)
-#define s_current_pi                        (g_power_control.currentPi)
-#define s_voltage_pi                        (g_power_control.voltagePi)
-#define s_soft_current_ma                   (g_power_control.softCurrentMa)
-#define s_buck_duty_x100                    (g_power_control.buckDutyX100)
-#define s_boost_duty_x100                   (g_power_control.boostDutyX100)
-#define s_async_boost_rectifier             (g_power_control.asyncBoostRectifier)
-#define s_power_stall_recover_count         (g_power_control.stallRecoverCount)
-#define s_output_ovp_count                  (g_power_control.outputOvpCount)
-#define s_output_ovp_blank_count            (g_power_control.outputOvpBlankCount)
-#define s_output_ocp_count                  (g_power_control.outputOcpCount)
-#define s_preconnect_active                 (g_power_control.preconnectActive)
-#define s_preconnect_ovp_limit_mv           (g_power_control.preconnectOvpLimitMv)
-#define s_afe_handover_guard_count          (g_power_control.afeHandoverGuardCount)
-#define s_battery_current_feedback_ma       (g_power_control.batteryCurrentFeedbackMa)
-#define s_battery_current_feedback_valid    (g_power_control.batteryCurrentFeedbackValid)
-#define s_battery_voltage_feedback_mv       (g_power_control.batteryVoltageFeedbackMv)
-#define s_battery_voltage_feedback_valid    (g_power_control.batteryVoltageFeedbackValid)
-#define s_fault_lockout                     (g_power_control.faultLockout)
-#define s_fault_status                      (g_power_control.faultStatus)
-
 uint16_t Clamp_U16(uint16_t value, uint16_t min_value, uint16_t max_value);
 uint16_t Power_Control_Clamp_Charge_Target_Mv(uint16_t target_voltage_mv, uint8_t mode);
 void Power_Control_Reset_Loop(void);

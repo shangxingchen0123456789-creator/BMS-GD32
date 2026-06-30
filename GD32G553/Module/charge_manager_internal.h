@@ -72,27 +72,6 @@ typedef struct {
 
 extern charge_manager_context_t g_charge_manager;
 
-#define s_params                            (g_charge_manager.params)
-#define s_state                             (g_charge_manager.state)
-#define s_run_request                       (g_charge_manager.runRequest)
-#define s_mode                              (g_charge_manager.mode)
-#define s_work_mode                         (g_charge_manager.workMode)
-#define s_latched_faults                    (g_charge_manager.latchedFaults)
-#define s_present_faults                    (g_charge_manager.presentFaults)
-#define s_cv_done_counter                   (g_charge_manager.cvDoneCounter)
-#define s_digital_power_enabled             (g_charge_manager.digitalPowerEnabled)
-#define s_digital_power_target_voltage_mv   (g_charge_manager.digitalPowerTargetVoltageMv)
-#define s_digital_power_current_limit_ma    (g_charge_manager.digitalPowerCurrentLimitMa)
-#define s_output_ovp_confirm_count          (g_charge_manager.outputOvpConfirmCount)
-#define s_digital_output_ovp_confirm_count  (g_charge_manager.digitalOutputOvpConfirmCount)
-#define s_charge_ocp_confirm_count          (g_charge_manager.chargeOcpConfirmCount)
-#define s_manual_fet_active                 (g_charge_manager.manualFetActive)
-#define s_manual_fet_mask                   (g_charge_manager.manualFetMask)
-#define s_path_settle_remaining_ms          (g_charge_manager.pathSettleRemainingMs)
-#define s_last_battery_path_enabled         (g_charge_manager.lastBatteryPathEnabled)
-#define s_path_settle_target_mv             (g_charge_manager.pathSettleTargetMv)
-#define s_preconnect_target_mv              (g_charge_manager.preconnectTargetMv)
-
 bms_command_reply_t Reply_Ok(void);
 bms_command_reply_t Reply_Error(uint8_t error_code);
 void Charge_Manager_Default_Parameters(bms_charge_parameters_t *parameters);

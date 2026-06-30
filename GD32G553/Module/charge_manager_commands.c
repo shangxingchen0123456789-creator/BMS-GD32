@@ -14,11 +14,11 @@ bms_command_reply_t Charge_Manager_Handle_Fet_Mask_Command(uint8_t fet_mask)
     }
 
     taskENTER_CRITICAL();
-    if(s_work_mode != (uint8_t)BMS_WORK_MODE_BMS) {
+    if(g_charge_manager.workMode != (uint8_t)BMS_WORK_MODE_BMS) {
         taskEXIT_CRITICAL();
         return Reply_Error((uint8_t)BMS_CMD_ERROR_INVALID_MODE);
     }
-    blocking_faults = s_latched_faults | Safety_Manager_Get_Latched_Faults();
+    blocking_faults = g_charge_manager.latchedFaults | Safety_Manager_Get_Latched_Faults();
 #if BMS_MANUAL_PRECONNECT_FET_ALLOW_WITH_FAULTS
     preconnect_only_mask = (AFE_GD30BM2016_FET_STATUS_PCHG |
                             AFE_GD30BM2016_FET_STATUS_DSG);
@@ -35,22 +35,22 @@ bms_command_reply_t Charge_Manager_Handle_Fet_Mask_Command(uint8_t fet_mask)
         return Reply_Error((uint8_t)BMS_CMD_ERROR_FAULT_ACTIVE);
     }
 
-    s_digital_power_enabled = 0U;
+    g_charge_manager.digitalPowerEnabled = 0U;
     Charge_Manager_Clear_Path_Settle_Unlocked();
-    s_run_request = 0U;
-    s_state = BMS_CHARGE_STATE_IDLE;
-    if(s_mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) {
-        s_mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
+    g_charge_manager.runRequest = 0U;
+    g_charge_manager.state = BMS_CHARGE_STATE_IDLE;
+    if(g_charge_manager.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) {
+        g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
     }
-    s_cv_done_counter = 0U;
+    g_charge_manager.cvDoneCounter = 0U;
     Charge_Manager_Reset_Output_Ovp_Counters();
     /*
      * Claim manual FET ownership before any I2C delay. Otherwise the 20 ms
      * control loop can see run_request == 0 and close the path again while the
      * command task is still waiting for BM2016 FET writes to finish.
      */
-    s_manual_fet_active = 1U;
-    s_manual_fet_mask = fet_mask;
+    g_charge_manager.manualFetActive = 1U;
+    g_charge_manager.manualFetMask = fet_mask;
     taskEXIT_CRITICAL();
 
     Power_Control_Stop();
@@ -65,8 +65,8 @@ bms_command_reply_t Charge_Manager_Handle_Fet_Mask_Command(uint8_t fet_mask)
     vTaskDelay(pdMS_TO_TICKS(MANUAL_FET_TAKEOVER_DELAY_MS));
 
     taskENTER_CRITICAL();
-    s_manual_fet_active = 1U;
-    s_manual_fet_mask = fet_mask;
+    g_charge_manager.manualFetActive = 1U;
+    g_charge_manager.manualFetMask = fet_mask;
     taskEXIT_CRITICAL();
 
     if(0U == Afe_Gd30bm2016_Set_Fet_Mask(fet_mask, &fet_status)) {
@@ -78,8 +78,8 @@ bms_command_reply_t Charge_Manager_Handle_Fet_Mask_Command(uint8_t fet_mask)
     }
 
     taskENTER_CRITICAL();
-    s_manual_fet_active = 1U;
-    s_manual_fet_mask = fet_mask;
+    g_charge_manager.manualFetActive = 1U;
+    g_charge_manager.manualFetMask = fet_mask;
     taskEXIT_CRITICAL();
 
     return Reply_Ok();
@@ -94,25 +94,25 @@ void Charge_Manager_Init(void)
     if(Param_Storage_Get_Charge(&stored_params) != 0U) {
         Charge_Manager_Clamp_Parameters(&stored_params);
         if(Charge_Manager_Validate_Parameters(&stored_params) != 0U) {
-            s_params = stored_params;
+            g_charge_manager.params = stored_params;
         } else {
-            Charge_Manager_Default_Parameters(&s_params);
-            Charge_Manager_Clamp_Parameters(&s_params);
+            Charge_Manager_Default_Parameters(&g_charge_manager.params);
+            Charge_Manager_Clamp_Parameters(&g_charge_manager.params);
         }
     } else {
-        Charge_Manager_Default_Parameters(&s_params);
-        Charge_Manager_Clamp_Parameters(&s_params);
+        Charge_Manager_Default_Parameters(&g_charge_manager.params);
+        Charge_Manager_Clamp_Parameters(&g_charge_manager.params);
     }
-    s_state = BMS_CHARGE_STATE_IDLE;
-    s_run_request = 0U;
-    s_mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
-    s_work_mode = (uint8_t)BMS_WORK_MODE_BMS;
-    s_latched_faults = 0U;
-    s_present_faults = 0U;
-    s_cv_done_counter = 0U;
-    s_digital_power_enabled = 0U;
-    s_digital_power_target_voltage_mv = 0U;
-    s_digital_power_current_limit_ma = 0U;
+    g_charge_manager.state = BMS_CHARGE_STATE_IDLE;
+    g_charge_manager.runRequest = 0U;
+    g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
+    g_charge_manager.workMode = (uint8_t)BMS_WORK_MODE_BMS;
+    g_charge_manager.latchedFaults = 0U;
+    g_charge_manager.presentFaults = 0U;
+    g_charge_manager.cvDoneCounter = 0U;
+    g_charge_manager.digitalPowerEnabled = 0U;
+    g_charge_manager.digitalPowerTargetVoltageMv = 0U;
+    g_charge_manager.digitalPowerCurrentLimitMa = 0U;
     Charge_Manager_Clear_Manual_Fet();
     Charge_Manager_Clear_Path_Settle_Unlocked();
     Charge_Manager_Reset_Output_Ovp_Counters();
@@ -129,7 +129,7 @@ void Charge_Manager_Get_Parameters(bms_charge_parameters_t *parameters)
     }
 
     taskENTER_CRITICAL();
-    *parameters = s_params;
+    *parameters = g_charge_manager.params;
     taskEXIT_CRITICAL();
 }
 
@@ -138,10 +138,10 @@ uint8_t Charge_Manager_Is_Digital_Power_Active(void)
     uint8_t active;
 
     taskENTER_CRITICAL();
-    active = ((s_work_mode == (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) ||
-              (s_digital_power_enabled != 0U) ||
-              (s_state == BMS_CHARGE_STATE_DIGITAL_POWER) ||
-              (s_mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) ? 1U : 0U;
+    active = ((g_charge_manager.workMode == (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) ||
+              (g_charge_manager.digitalPowerEnabled != 0U) ||
+              (g_charge_manager.state == BMS_CHARGE_STATE_DIGITAL_POWER) ||
+              (g_charge_manager.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) ? 1U : 0U;
     taskEXIT_CRITICAL();
 
     return active;
@@ -152,7 +152,7 @@ uint8_t Charge_Manager_Get_Work_Mode(void)
     uint8_t work_mode;
 
     taskENTER_CRITICAL();
-    work_mode = s_work_mode;
+    work_mode = g_charge_manager.workMode;
     taskEXIT_CRITICAL();
 
     return work_mode;
@@ -165,16 +165,16 @@ bms_command_reply_t Charge_Manager_Set_Work_Mode(uint8_t work_mode)
     }
 
     taskENTER_CRITICAL();
-    s_work_mode = work_mode;
-    s_digital_power_enabled = 0U;
+    g_charge_manager.workMode = work_mode;
+    g_charge_manager.digitalPowerEnabled = 0U;
     Charge_Manager_Clear_Manual_Fet();
     Charge_Manager_Clear_Path_Settle_Unlocked();
-    s_run_request = 0U;
-    s_state = BMS_CHARGE_STATE_IDLE;
-    s_mode = (work_mode == (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) ?
+    g_charge_manager.runRequest = 0U;
+    g_charge_manager.state = BMS_CHARGE_STATE_IDLE;
+    g_charge_manager.mode = (work_mode == (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) ?
              (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER :
              (uint8_t)BMS_CHARGE_MODE_AUTO;
-    s_cv_done_counter = 0U;
+    g_charge_manager.cvDoneCounter = 0U;
     Charge_Manager_Reset_Output_Ovp_Counters();
     taskEXIT_CRITICAL();
 
@@ -202,11 +202,11 @@ bms_command_reply_t Charge_Manager_Set_Parameters(const bms_charge_parameters_t 
     }
 
     taskENTER_CRITICAL();
-    if(s_work_mode != (uint8_t)BMS_WORK_MODE_BMS) {
+    if(g_charge_manager.workMode != (uint8_t)BMS_WORK_MODE_BMS) {
         taskEXIT_CRITICAL();
         return Reply_Error((uint8_t)BMS_CMD_ERROR_INVALID_MODE);
     }
-    s_params = clamped_parameters;
+    g_charge_manager.params = clamped_parameters;
     taskEXIT_CRITICAL();
     (void)Param_Storage_Set_Charge(&clamped_parameters);
     return Reply_Ok();
@@ -223,20 +223,20 @@ bms_command_reply_t Charge_Manager_Handle_Command(uint8_t command_id, uint8_t ar
     switch(command_id) {
     case CMD_START_CHARGE:
         taskENTER_CRITICAL();
-        if(s_work_mode != (uint8_t)BMS_WORK_MODE_BMS) {
+        if(g_charge_manager.workMode != (uint8_t)BMS_WORK_MODE_BMS) {
             reply = Reply_Error((uint8_t)BMS_CMD_ERROR_INVALID_MODE);
-        } else if((s_latched_faults | Safety_Manager_Get_Latched_Faults()) != 0U) {
+        } else if((g_charge_manager.latchedFaults | Safety_Manager_Get_Latched_Faults()) != 0U) {
             reply = Reply_Error((uint8_t)BMS_CMD_ERROR_FAULT_ACTIVE);
         } else {
-            s_digital_power_enabled = 0U;
+            g_charge_manager.digitalPowerEnabled = 0U;
             Charge_Manager_Clear_Manual_Fet();
             Charge_Manager_Clear_Path_Settle_Unlocked();
-            if(s_mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) {
-                s_mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
+            if(g_charge_manager.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) {
+                g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
             }
-            s_run_request = 1U;
-            s_state = BMS_CHARGE_STATE_PRECHECK;
-            s_cv_done_counter = 0U;
+            g_charge_manager.runRequest = 1U;
+            g_charge_manager.state = BMS_CHARGE_STATE_PRECHECK;
+            g_charge_manager.cvDoneCounter = 0U;
             Charge_Manager_Reset_Output_Ovp_Counters();
             reply = Reply_Ok();
         }
@@ -249,16 +249,16 @@ bms_command_reply_t Charge_Manager_Handle_Command(uint8_t command_id, uint8_t ar
 
     case CMD_STOP_CHARGE:
         taskENTER_CRITICAL();
-        s_digital_power_enabled = 0U;
+        g_charge_manager.digitalPowerEnabled = 0U;
         Charge_Manager_Clear_Manual_Fet();
         Charge_Manager_Clear_Path_Settle_Unlocked();
-        if((s_work_mode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) &&
-           (s_mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) {
-            s_mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
+        if((g_charge_manager.workMode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) &&
+           (g_charge_manager.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) {
+            g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
         }
-        s_run_request = 0U;
-        s_state = BMS_CHARGE_STATE_IDLE;
-        s_cv_done_counter = 0U;
+        g_charge_manager.runRequest = 0U;
+        g_charge_manager.state = BMS_CHARGE_STATE_IDLE;
+        g_charge_manager.cvDoneCounter = 0U;
         Charge_Manager_Reset_Output_Ovp_Counters();
         taskEXIT_CRITICAL();
         Power_Control_Stop();
@@ -269,12 +269,12 @@ bms_command_reply_t Charge_Manager_Handle_Command(uint8_t command_id, uint8_t ar
 
     case CMD_EMERGENCY_STOP:
         taskENTER_CRITICAL();
-        s_digital_power_enabled = 0U;
+        g_charge_manager.digitalPowerEnabled = 0U;
         Charge_Manager_Clear_Manual_Fet();
         Charge_Manager_Clear_Path_Settle_Unlocked();
-        s_run_request = 0U;
-        s_state = BMS_CHARGE_STATE_FAULT;
-        s_latched_faults |= BMS_FAULT_EMERGENCY_STOP;
+        g_charge_manager.runRequest = 0U;
+        g_charge_manager.state = BMS_CHARGE_STATE_FAULT;
+        g_charge_manager.latchedFaults |= BMS_FAULT_EMERGENCY_STOP;
         Charge_Manager_Reset_Output_Ovp_Counters();
         taskEXIT_CRITICAL();
         Safety_Manager_Report_Faults(BMS_FAULT_EMERGENCY_STOP);
@@ -286,7 +286,7 @@ bms_command_reply_t Charge_Manager_Handle_Command(uint8_t command_id, uint8_t ar
     case CMD_CLEAR_FAULT:
         (void)Afe_Gd30bm2016_Recover_Protections();
         taskENTER_CRITICAL();
-        present_faults = s_present_faults;
+        present_faults = g_charge_manager.presentFaults;
         taskEXIT_CRITICAL();
         power_faults = Power_Control_Get_Fault_Status();
         present_faults &= ~power_faults;
@@ -303,18 +303,18 @@ bms_command_reply_t Charge_Manager_Handle_Command(uint8_t command_id, uint8_t ar
             reply = Reply_Error((uint8_t)BMS_CMD_ERROR_FAULT_ACTIVE);
         } else {
             taskENTER_CRITICAL();
-            s_digital_power_enabled = 0U;
+            g_charge_manager.digitalPowerEnabled = 0U;
             Charge_Manager_Clear_Manual_Fet();
             Charge_Manager_Clear_Path_Settle_Unlocked();
-            if((s_work_mode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) &&
-               (s_mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) {
-                s_mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
+            if((g_charge_manager.workMode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) &&
+               (g_charge_manager.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) {
+                g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
             }
-            s_run_request = 0U;
-            s_state = BMS_CHARGE_STATE_IDLE;
-            s_latched_faults = 0U;
-            s_present_faults = 0U;
-            s_cv_done_counter = 0U;
+            g_charge_manager.runRequest = 0U;
+            g_charge_manager.state = BMS_CHARGE_STATE_IDLE;
+            g_charge_manager.latchedFaults = 0U;
+            g_charge_manager.presentFaults = 0U;
+            g_charge_manager.cvDoneCounter = 0U;
             Charge_Manager_Reset_Output_Ovp_Counters();
             taskEXIT_CRITICAL();
             Safety_Manager_Clear_Latched_Faults();
@@ -332,22 +332,22 @@ bms_command_reply_t Charge_Manager_Handle_Command(uint8_t command_id, uint8_t ar
             reply = Reply_Error((uint8_t)BMS_CMD_ERROR_INVALID_PARAM);
         } else {
             taskENTER_CRITICAL();
-            if(s_work_mode != (uint8_t)BMS_WORK_MODE_BMS) {
+            if(g_charge_manager.workMode != (uint8_t)BMS_WORK_MODE_BMS) {
                 reply = Reply_Error((uint8_t)BMS_CMD_ERROR_INVALID_MODE);
                 run_request_active = 0U;
             } else {
-            s_digital_power_enabled = 0U;
+            g_charge_manager.digitalPowerEnabled = 0U;
             Charge_Manager_Clear_Manual_Fet();
             Charge_Manager_Clear_Path_Settle_Unlocked();
-            s_mode = argument;
-            run_request_active = s_run_request;
-            if(s_run_request != 0U) {
+            g_charge_manager.mode = argument;
+            run_request_active = g_charge_manager.runRequest;
+            if(g_charge_manager.runRequest != 0U) {
                 /*
                  * 杩愯涓垏鎹㈡ā寮忔椂锛屼笅涓€杞帶鍒跺懆鏈熷繀椤婚噸鏂版寜鏂版ā寮忛€夋嫨
                  * 娑撴祦/鎭掓祦/鎭掑帇闃舵锛屽惁鍒欑洰鏍囩數娴佸彲鑳借繕娌跨敤鏃ч樁娈点€?
                 */
-                s_state = BMS_CHARGE_STATE_PRECHECK;
-                s_cv_done_counter = 0U;
+                g_charge_manager.state = BMS_CHARGE_STATE_PRECHECK;
+                g_charge_manager.cvDoneCounter = 0U;
                 Charge_Manager_Reset_Output_Ovp_Counters();
             }
             reply = Reply_Ok();
@@ -397,16 +397,16 @@ bms_command_reply_t Charge_Manager_Handle_Digital_Power_Command(uint8_t enable,
 
     if(enable == 0U) {
         taskENTER_CRITICAL();
-        s_digital_power_enabled = 0U;
+        g_charge_manager.digitalPowerEnabled = 0U;
         Charge_Manager_Clear_Manual_Fet();
         Charge_Manager_Clear_Path_Settle_Unlocked();
-        if((s_work_mode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) &&
-           (s_mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) {
-            s_mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
+        if((g_charge_manager.workMode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) &&
+           (g_charge_manager.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) {
+            g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
         }
-        s_run_request = 0U;
-        s_state = BMS_CHARGE_STATE_IDLE;
-        s_cv_done_counter = 0U;
+        g_charge_manager.runRequest = 0U;
+        g_charge_manager.state = BMS_CHARGE_STATE_IDLE;
+        g_charge_manager.cvDoneCounter = 0U;
         Charge_Manager_Reset_Output_Ovp_Counters();
         taskEXIT_CRITICAL();
         Power_Control_Stop();
@@ -419,23 +419,23 @@ bms_command_reply_t Charge_Manager_Handle_Digital_Power_Command(uint8_t enable,
     }
 
     taskENTER_CRITICAL();
-    if(s_work_mode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) {
+    if(g_charge_manager.workMode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) {
         taskEXIT_CRITICAL();
         return Reply_Error((uint8_t)BMS_CMD_ERROR_INVALID_MODE);
     }
-    if(s_digital_power_enabled != 0U) {
+    if(g_charge_manager.digitalPowerEnabled != 0U) {
         /*
          * 宸插湪鏁板瓧鐢垫簮杩愯涓紝鐩存帴鏇存柊鐩爣鐢靛帇/鐢垫祦銆?
          * 鐢靛帇鐜細骞虫粦璺熻釜鍒版柊璁惧畾鍊硷紝涓嶅啀鍋滄満娉勬斁鍐嶉噸鍚€?
          * 璋冧綆鐢靛帇鏃剁敱 OVP 杞檺骞呭厹搴曪紝鑰屼笉鏄厛鎺夌數銆?
          */
-        s_digital_power_target_voltage_mv = target_voltage_mv;
-        s_digital_power_current_limit_ma = current_limit_ma;
+        g_charge_manager.digitalPowerTargetVoltageMv = target_voltage_mv;
+        g_charge_manager.digitalPowerCurrentLimitMa = current_limit_ma;
         Charge_Manager_Clear_Manual_Fet();
         Charge_Manager_Clear_Path_Settle_Unlocked();
-        s_state = BMS_CHARGE_STATE_DIGITAL_POWER;
-        s_mode = (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER;
-        s_cv_done_counter = 0U;
+        g_charge_manager.state = BMS_CHARGE_STATE_DIGITAL_POWER;
+        g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER;
+        g_charge_manager.cvDoneCounter = 0U;
         Charge_Manager_Reset_Output_Ovp_Counters();
         taskEXIT_CRITICAL();
         Power_Control_Set(target_voltage_mv, current_limit_ma,
@@ -443,7 +443,7 @@ bms_command_reply_t Charge_Manager_Handle_Digital_Power_Command(uint8_t enable,
         Safety_Manager_Set_Afe_Alert_Monitor(0U);
         return Reply_Ok();
     }
-    raw_faults = s_latched_faults | Safety_Manager_Get_Latched_Faults();
+    raw_faults = g_charge_manager.latchedFaults | Safety_Manager_Get_Latched_Faults();
     taskEXIT_CRITICAL();
     raw_faults |= Power_Control_Get_Fault_Status();
 
@@ -457,7 +457,7 @@ bms_command_reply_t Charge_Manager_Handle_Digital_Power_Command(uint8_t enable,
 #if BMS_DIGITAL_POWER_AFELESS_DEBUG
     if(raw_faults != 0U) {
         taskENTER_CRITICAL();
-        s_latched_faults = 0U;
+        g_charge_manager.latchedFaults = 0U;
         taskEXIT_CRITICAL();
         Safety_Manager_Clear_Latched_Faults();
         Power_Control_Clear_Fault_Lockout();
@@ -466,15 +466,15 @@ bms_command_reply_t Charge_Manager_Handle_Digital_Power_Command(uint8_t enable,
 #endif
 
     taskENTER_CRITICAL();
-    s_digital_power_enabled = 1U;
-    s_digital_power_target_voltage_mv = target_voltage_mv;
-    s_digital_power_current_limit_ma = current_limit_ma;
+    g_charge_manager.digitalPowerEnabled = 1U;
+    g_charge_manager.digitalPowerTargetVoltageMv = target_voltage_mv;
+    g_charge_manager.digitalPowerCurrentLimitMa = current_limit_ma;
     Charge_Manager_Clear_Manual_Fet();
     Charge_Manager_Clear_Path_Settle_Unlocked();
-    s_run_request = 0U;
-    s_state = BMS_CHARGE_STATE_DIGITAL_POWER;
-    s_mode = (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER;
-    s_cv_done_counter = 0U;
+    g_charge_manager.runRequest = 0U;
+    g_charge_manager.state = BMS_CHARGE_STATE_DIGITAL_POWER;
+    g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER;
+    g_charge_manager.cvDoneCounter = 0U;
     Charge_Manager_Reset_Output_Ovp_Counters();
     reply = Reply_Ok();
     taskEXIT_CRITICAL();

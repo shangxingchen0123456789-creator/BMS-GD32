@@ -83,13 +83,13 @@ uint8_t Charge_Manager_Power_Ocp_Check_Active(uint8_t power_requested,
 
 void Charge_Manager_Reset_Output_Ovp_Counters(void)
 {
-    s_output_ovp_confirm_count = 0U;
-    s_digital_output_ovp_confirm_count = 0U;
+    g_charge_manager.outputOvpConfirmCount = 0U;
+    g_charge_manager.digitalOutputOvpConfirmCount = 0U;
 }
 
 void Charge_Manager_Reset_Charge_Ocp_Counter(void)
 {
-    s_charge_ocp_confirm_count = 0U;
+    g_charge_manager.chargeOcpConfirmCount = 0U;
 }
 
 
@@ -105,15 +105,15 @@ uint8_t Charge_Manager_Output_Ovp_Confirmed(uint16_t output_voltage_mv,
 
     if(run_request == 0U) {
         if(digital_power != 0U) {
-            s_digital_output_ovp_confirm_count = 0U;
+            g_charge_manager.digitalOutputOvpConfirmCount = 0U;
         } else {
-            s_output_ovp_confirm_count = 0U;
+            g_charge_manager.outputOvpConfirmCount = 0U;
         }
         return 0U;
     }
 
-    counter = (digital_power != 0U) ? &s_digital_output_ovp_confirm_count :
-                                      &s_output_ovp_confirm_count;
+    counter = (digital_power != 0U) ? &g_charge_manager.digitalOutputOvpConfirmCount :
+                                      &g_charge_manager.outputOvpConfirmCount;
     margin_mv = (digital_power != 0U) ? BMS_DIGITAL_POWER_OUTPUT_OVP_MARGIN_MV :
                                         PACK_OVP_MARGIN_MV;
     ovp_limit_mv = (uint32_t)target_voltage_mv + margin_mv;
@@ -141,13 +141,13 @@ void Charge_Manager_Record_Faults(uint32_t realtime_faults,
 {
     if(latchable_faults != 0U) {
         taskENTER_CRITICAL();
-        s_latched_faults |= latchable_faults;
+        g_charge_manager.latchedFaults |= latchable_faults;
         taskEXIT_CRITICAL();
         Safety_Manager_Report_Faults(latchable_faults);
     }
 
     taskENTER_CRITICAL();
-    s_present_faults = realtime_faults;
+    g_charge_manager.presentFaults = realtime_faults;
     taskEXIT_CRITICAL();
 }
 
@@ -176,11 +176,11 @@ uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
      * 涓€鏃﹀嚭鐜板氨鍚屾浜ょ粰 safety_manager 绔嬪嵆鍏虫柇 Q4/Q5銆?
      */
     taskENTER_CRITICAL();
-    faults = s_latched_faults;
-    digital_power_enabled = s_digital_power_enabled;
+    faults = g_charge_manager.latchedFaults;
+    digital_power_enabled = g_charge_manager.digitalPowerEnabled;
     output_target_mv = (digital_power_enabled != 0U) ?
-                       s_digital_power_target_voltage_mv :
-                       s_params.targetVoltageMv;
+                       g_charge_manager.digitalPowerTargetVoltageMv :
+                       g_charge_manager.params.targetVoltageMv;
     taskEXIT_CRITICAL();
     faults |= Safety_Manager_Get_Latched_Faults();
     afeless_filter_active = Charge_Manager_Afeless_Filter_Active(digital_power_enabled,
@@ -189,7 +189,7 @@ uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
         faults = Charge_Manager_Filter_Digital_Power_Afeless_Faults(faults);
     }
     realtime_faults = 0U;
-    current_limit_ma = s_params.targetCurrentMa;
+    current_limit_ma = g_charge_manager.params.targetCurrentMa;
     Power_Control_Get_State(&power_state);
     Power_Path_Manager_Get_State(&path_state);
     realtime_faults |= power_state.faultBitmap;
@@ -230,10 +230,10 @@ uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
         }
         realtime_faults |= afe_faults;
         if(0U != Charge_Manager_Afe_Sample_Valid(afe)) {
-            if(afe->cellMaxMv >= s_params.cellOvpMv) {
+            if(afe->cellMaxMv >= g_charge_manager.params.cellOvpMv) {
                 realtime_faults |= BMS_FAULT_CELL_OVP;
             }
-            if(afe->cellMinMv <= s_params.cellUvpMv) {
+            if(afe->cellMinMv <= g_charge_manager.params.cellUvpMv) {
                 realtime_faults |= BMS_FAULT_CELL_UVP;
             }
             if((digital_power_enabled == 0U) &&
@@ -243,7 +243,7 @@ uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
             }
             for(i = 0U; i < BMS_AFE_TEMP_COUNT; i++) {
                 if((0U != Charge_Manager_Temperature_Valid(afe->temperaturesX10[i])) &&
-                   afe->temperaturesX10[i] >= s_params.tempOtpX10) {
+                   afe->temperaturesX10[i] >= g_charge_manager.params.tempOtpX10) {
                     realtime_faults |= BMS_FAULT_OTP;
                 }
             }
@@ -279,19 +279,19 @@ uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
         if((power_ocp_check_active != 0U) &&
            (power_sample->faultOcActive != 0U ||
             power_sample->outputCurrentMa > (int16_t)(current_limit_ma + 1500U))) {
-            if(s_charge_ocp_confirm_count < BMS_OUTPUT_OVP_CONFIRM_CONTROL_COUNT) {
-                s_charge_ocp_confirm_count++;
+            if(g_charge_manager.chargeOcpConfirmCount < BMS_OUTPUT_OVP_CONFIRM_CONTROL_COUNT) {
+                g_charge_manager.chargeOcpConfirmCount++;
             }
-            if(s_charge_ocp_confirm_count >= BMS_OUTPUT_OVP_CONFIRM_CONTROL_COUNT) {
+            if(g_charge_manager.chargeOcpConfirmCount >= BMS_OUTPUT_OVP_CONFIRM_CONTROL_COUNT) {
                 realtime_faults |= BMS_FAULT_CHARGE_OCP;
             }
         } else {
             Charge_Manager_Reset_Charge_Ocp_Counter();
         }
         if(((0U != Charge_Manager_Temperature_Valid(power_sample->mosTempX10)) &&
-            power_sample->mosTempX10 >= s_params.tempOtpX10) ||
+            power_sample->mosTempX10 >= g_charge_manager.params.tempOtpX10) ||
            ((0U != Charge_Manager_Temperature_Valid(power_sample->inductorTempX10)) &&
-            power_sample->inductorTempX10 >= s_params.tempOtpX10)) {
+            power_sample->inductorTempX10 >= g_charge_manager.params.tempOtpX10)) {
             realtime_faults |= BMS_FAULT_OTP;
         }
         realtime_faults |= power_sample->faultBitmap;
@@ -331,7 +331,7 @@ uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
     }
 
     taskENTER_CRITICAL();
-    s_present_faults = realtime_faults;
+    g_charge_manager.presentFaults = realtime_faults;
     taskEXIT_CRITICAL();
 
     latchable_faults = realtime_faults;
@@ -344,8 +344,8 @@ uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
 
     if(latchable_faults != 0U) {
         taskENTER_CRITICAL();
-        s_latched_faults |= latchable_faults;
-        faults |= s_latched_faults;
+        g_charge_manager.latchedFaults |= latchable_faults;
+        faults |= g_charge_manager.latchedFaults;
         taskEXIT_CRITICAL();
         Safety_Manager_Report_Faults(latchable_faults);
     }
@@ -367,7 +367,7 @@ uint32_t Charge_Manager_Collect_Digital_Power_Faults(const bms_power_sample_t *p
     power_control_state_t power_state;
 
     taskENTER_CRITICAL();
-    faults = s_latched_faults;
+    faults = g_charge_manager.latchedFaults;
     taskEXIT_CRITICAL();
 
     faults |= Safety_Manager_Get_Latched_Faults();
@@ -395,9 +395,9 @@ uint32_t Charge_Manager_Collect_Digital_Power_Faults(const bms_power_sample_t *p
             realtime_faults |= BMS_FAULT_CHARGE_OCP;
         }
         if(((0U != Charge_Manager_Temperature_Valid(power_sample->mosTempX10)) &&
-            power_sample->mosTempX10 >= s_params.tempOtpX10) ||
+            power_sample->mosTempX10 >= g_charge_manager.params.tempOtpX10) ||
            ((0U != Charge_Manager_Temperature_Valid(power_sample->inductorTempX10)) &&
-            power_sample->inductorTempX10 >= s_params.tempOtpX10)) {
+            power_sample->inductorTempX10 >= g_charge_manager.params.tempOtpX10)) {
             realtime_faults |= BMS_FAULT_OTP;
         }
     }
@@ -407,7 +407,7 @@ uint32_t Charge_Manager_Collect_Digital_Power_Faults(const bms_power_sample_t *p
     Charge_Manager_Record_Faults(realtime_faults, realtime_faults);
 
     taskENTER_CRITICAL();
-    faults |= s_latched_faults;
+    faults |= g_charge_manager.latchedFaults;
     taskEXIT_CRITICAL();
 
     faults |= realtime_faults | Safety_Manager_Get_Latched_Faults();

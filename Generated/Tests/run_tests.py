@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -79,6 +80,7 @@ GENERATED_EXPECTED_FILES = [
     "Docs/changelog.md",
     "Docs/charge_manager_split_design.md",
     "Docs/coding_standard.md",
+    "Docs/internal_context_access_design.md",
     "Docs/power_control_split_design.md",
     "Docs/power_pwm_module_design.md",
     "Docs/remove_inc_modules_design.md",
@@ -89,6 +91,7 @@ GENERATED_EXPECTED_FILES = [
     "BuildLogs/uv4_power_control_split_rebuild_20260630.log",
     "BuildLogs/uv4_power_pwm_module_rebuild_20260630.log",
     "BuildLogs/uv4_remove_inc_modules_rebuild_20260630.log",
+    "BuildLogs/uv4_internal_context_access_rebuild_20260630.log",
 ]
 
 OLD_GENERATED_PATHS = [
@@ -215,6 +218,25 @@ def assert_real_internal_modules() -> None:
             fail(f"source still references .inc: {source_path}")
 
 
+def assert_internal_context_access_explicit() -> None:
+    alias_pattern = re.compile(r"\bs_[A-Za-z0-9_]+")
+    target_files = [
+        FW / "Driver" / "power_control_internal.h",
+        FW / "Module" / "charge_manager_internal.h",
+    ]
+    target_files.extend((FW / "Driver").glob("power_control*.c"))
+    target_files.extend((FW / "Module").glob("charge_manager*.c"))
+
+    for source_path in target_files:
+        source = source_path.read_text(encoding="utf-8")
+        if "#define s_" in source:
+            fail(f"internal context alias macro remains: {source_path}")
+
+        aliases = sorted(set(alias_pattern.findall(source)))
+        if aliases:
+            fail(f"internal context aliases remain in {source_path}: {', '.join(aliases)}")
+
+
 def assert_power_pwm_module() -> None:
     power_control = (FW / "Driver" / "power_control.c").read_text(encoding="utf-8")
     power_control_internal = (FW / "Driver" / "power_control_internal.h").read_text(encoding="utf-8")
@@ -297,6 +319,7 @@ def main() -> int:
         ("Keil include paths use layers", assert_keil_uses_layers),
         ("no inc files remain", assert_no_inc_files),
         ("real internal modules referenced", assert_real_internal_modules),
+        ("internal context access is explicit", assert_internal_context_access_explicit),
         ("power pwm module extracted", assert_power_pwm_module),
         ("generated files grouped", assert_generated_files_grouped),
     ]

@@ -127,3 +127,42 @@ Program Size: Code=76340 RO-data=1896 RW-data=8 ZI-data=24592
 "..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
 Build Time Elapsed:  00:00:06
 ```
+
+## Internal Context Access Follow-up
+
+This round removes the transitional `s_xxx` macro aliases from the internal
+headers and updates the converted modules to access `g_power_control` and
+`g_charge_manager` fields directly.
+
+`python Generated\Tests\run_tests.py` passed for this follow-up on 2026-06-30:
+
+```text
+PASS layer files exist
+PASS old moved paths removed
+PASS Keil FilePath entries resolve
+PASS Keil include paths use layers
+PASS no inc files remain
+PASS real internal modules referenced
+PASS internal context access is explicit
+PASS power pwm module extracted
+PASS generated files grouped
+SKIP optional C unit tests: no gcc, clang, or cl found on PATH
+```
+
+Keil UV4 command-line rebuild passed for this follow-up on 2026-06-30:
+
+```text
+compiling power_control_safety.c...
+compiling power_control_api.c...
+compiling power_control_mode.c...
+compiling power_control_limits.c...
+compiling charge_manager.c...
+compiling charge_manager_params.c...
+compiling charge_manager_path.c...
+compiling charge_manager_faults.c...
+compiling charge_manager_commands.c...
+compiling charge_manager_control.c...
+Program Size: Code=76340 RO-data=1896 RW-data=8 ZI-data=24592
+"..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:06
+```

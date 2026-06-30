@@ -2,6 +2,13 @@
 
 ## 2026-06-30
 
+- Removed transitional `s_xxx` internal context macro aliases from
+  `power_control_internal.h` and `charge_manager_internal.h`.
+- Updated `power_control_*` and `charge_manager_*` real modules to access
+  `g_power_control` and `g_charge_manager` fields explicitly.
+- Added generated structure tests that reject reintroduced `#define s_` aliases
+  and remaining `s_xxx` context references in the converted modules.
+
 - Converted all remaining project-owned `.inc` files into real `.c` modules.
 - Added `power_control_internal.h` and `charge_manager_internal.h` to hold
   private contexts and internal helper contracts for the former fragments.

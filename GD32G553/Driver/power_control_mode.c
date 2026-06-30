@@ -16,12 +16,12 @@ uint8_t Power_Voltage_Loop_Should_Run(const bms_power_sample_t *sample,
         return 0U;
     }
 
-    if(s_power.mode == (uint8_t)BMS_CHARGE_MODE_CV) {
+    if(g_power_control.power.mode == (uint8_t)BMS_CHARGE_MODE_CV) {
         return 1U;
     }
 
-    if(s_power.mode == (uint8_t)BMS_CHARGE_MODE_CC ||
-       s_power.mode == (uint8_t)BMS_CHARGE_MODE_TRICKLE) {
+    if(g_power_control.power.mode == (uint8_t)BMS_CHARGE_MODE_CC ||
+       g_power_control.power.mode == (uint8_t)BMS_CHARGE_MODE_TRICKLE) {
         return 0U;
     }
 
@@ -29,7 +29,7 @@ uint8_t Power_Voltage_Loop_Should_Run(const bms_power_sample_t *sample,
         return 1U;
     }
 
-    if((uint32_t)sample->outputVoltageMv + POWER_VOLTAGE_CV_MARGIN_MV >= s_power.targetVoltageMv) {
+    if((uint32_t)sample->outputVoltageMv + POWER_VOLTAGE_CV_MARGIN_MV >= g_power_control.power.targetVoltageMv) {
         return 1U;
     }
 
@@ -39,15 +39,15 @@ uint8_t Power_Voltage_Loop_Should_Run(const bms_power_sample_t *sample,
 uint8_t Power_Control_Async_Boost_Should_Run(uint16_t current_ref_ma,
                                                     uint16_t measured_current_ma)
 {
-    if(s_power.powerStageMode != (uint8_t)POWER_STAGE_MODE_BOOST) {
+    if(g_power_control.power.powerStageMode != (uint8_t)POWER_STAGE_MODE_BOOST) {
         return 0U;
     }
 
-    if(s_power.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) {
+    if(g_power_control.power.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) {
         return 0U;
     }
 
-    if(s_preconnect_active != 0U) {
+    if(g_power_control.preconnectActive != 0U) {
 #if BMS_POWER_PRECONNECT_ASYNC_BOOST_RECTIFIER
         return 1U;
 #else
@@ -60,7 +60,7 @@ uint8_t Power_Control_Async_Boost_Should_Run(uint16_t current_ref_ma,
     }
 
 #if BMS_POWER_LIGHT_LOAD_ASYNC_BOOST_RECTIFIER
-    if(s_power.mode == (uint8_t)BMS_CHARGE_MODE_CC) {
+    if(g_power_control.power.mode == (uint8_t)BMS_CHARGE_MODE_CC) {
         (void)current_ref_ma;
         (void)measured_current_ma;
         return 1U;
@@ -70,7 +70,7 @@ uint8_t Power_Control_Async_Boost_Should_Run(uint16_t current_ref_ma,
         return 1U;
     }
 
-    if(s_async_boost_rectifier != 0U) {
+    if(g_power_control.asyncBoostRectifier != 0U) {
         return (measured_current_ma <= POWER_ASYNC_BOOST_EXIT_CURRENT_MA) ? 1U : 0U;
     }
 
@@ -99,22 +99,22 @@ void Power_Control_Record_Trip(uint8_t reason,
                                       const bms_power_sample_t *sample,
                                       uint16_t current_ref_ma)
 {
-    s_power.tripReason = reason;
-    s_power.tripFaults = faults;
-    s_power.tripCurrentRefMa = current_ref_ma;
-    s_power.tripOcpLimitMa = Power_Ocp_Limit_From_Ref(current_ref_ma);
-    s_power.tripDutyX100 = s_power.dutyX100;
+    g_power_control.power.tripReason = reason;
+    g_power_control.power.tripFaults = faults;
+    g_power_control.power.tripCurrentRefMa = current_ref_ma;
+    g_power_control.power.tripOcpLimitMa = Power_Ocp_Limit_From_Ref(current_ref_ma);
+    g_power_control.power.tripDutyX100 = g_power_control.power.dutyX100;
 
     if(sample != 0) {
-        s_power.tripIoutMa = sample->outputCurrentMa;
-        s_power.tripVoutMv = sample->outputVoltageMv;
-        s_power.tripVinMv = sample->inputVoltageMv;
-        s_power.tripFaultOcActive = sample->faultOcActive;
+        g_power_control.power.tripIoutMa = sample->outputCurrentMa;
+        g_power_control.power.tripVoutMv = sample->outputVoltageMv;
+        g_power_control.power.tripVinMv = sample->inputVoltageMv;
+        g_power_control.power.tripFaultOcActive = sample->faultOcActive;
     } else {
-        s_power.tripIoutMa = 0;
-        s_power.tripVoutMv = 0U;
-        s_power.tripVinMv = 0U;
-        s_power.tripFaultOcActive = 0U;
+        g_power_control.power.tripIoutMa = 0;
+        g_power_control.power.tripVoutMv = 0U;
+        g_power_control.power.tripVinMv = 0U;
+        g_power_control.power.tripFaultOcActive = 0U;
     }
 }
 
@@ -124,18 +124,18 @@ void Power_Control_Pwm_Output_Context(power_pwm_output_context_t *context)
         return;
     }
 
-    context->faultLockout = s_fault_lockout;
-    context->faultStatus = s_fault_status;
-    context->asyncBoostRectifier = s_async_boost_rectifier;
+    context->faultLockout = g_power_control.faultLockout;
+    context->faultStatus = g_power_control.faultStatus;
+    context->asyncBoostRectifier = g_power_control.asyncBoostRectifier;
     context->boostStageActive =
-        (s_power.powerStageMode == (uint8_t)POWER_STAGE_MODE_BOOST) ? 1U : 0U;
-    context->boostLowDutyX100 = s_boost_duty_x100;
-    context->preconnectActive = s_preconnect_active;
+        (g_power_control.power.powerStageMode == (uint8_t)POWER_STAGE_MODE_BOOST) ? 1U : 0U;
+    context->boostLowDutyX100 = g_power_control.boostDutyX100;
+    context->preconnectActive = g_power_control.preconnectActive;
 }
 
 void Power_Control_Pwm_Apply(void)
 {
-    Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100, s_fault_lockout);
+    Power_Pwm_Apply(g_power_control.buckDutyX100, g_power_control.boostDutyX100, g_power_control.faultLockout);
 }
 
 void Power_Control_Pwm_Enable(void)
@@ -177,25 +177,25 @@ void Power_Map_Control_To_Pwm(const bms_power_sample_t *sample, uint16_t control
        ((uint32_t)output_voltage_mv + POWER_REGION_MARGIN_MV < region_target_mv)) {
         buck_duty = POWER_DUTY_MAX_X100;
         boost_duty = control_x100;
-        s_power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BOOST;
+        g_power_control.power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BOOST;
     } else if(input_voltage_mv == 0U) {
         buck_duty = control_x100;
         boost_duty = 0U;
-        s_power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BUCK;
+        g_power_control.power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BUCK;
     } else if((uint32_t)input_voltage_mv > region_target_mv + POWER_REGION_MARGIN_MV) {
         buck_duty = control_x100;
         boost_duty = 0U;
-        s_power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BUCK;
+        g_power_control.power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BUCK;
     } else if((uint32_t)input_voltage_mv + POWER_REGION_MARGIN_MV < region_target_mv) {
         buck_duty = POWER_DUTY_MAX_X100;
         boost_duty = control_x100;
-        s_power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BOOST;
+        g_power_control.power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BOOST;
     } else {
         buck_duty = control_x100;
         boost_duty = control_x100;
-        s_power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BUCK_BOOST;
+        g_power_control.power.powerStageMode = (uint8_t)POWER_STAGE_MODE_BUCK_BOOST;
     }
 
-    s_buck_duty_x100 = buck_duty;
-    s_boost_duty_x100 = boost_duty;
+    g_power_control.buckDutyX100 = buck_duty;
+    g_power_control.boostDutyX100 = boost_duty;
 }

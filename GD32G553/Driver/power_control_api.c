@@ -5,9 +5,9 @@ void Power_Control_Init(void)
     pi_controller_config_t current_config;
     pi_controller_config_t voltage_config;
 
-    memset(&s_power, 0, sizeof(s_power));
-    s_fault_lockout = 0U;
-    s_fault_status = 0U;
+    memset(&g_power_control.power, 0, sizeof(g_power_control.power));
+    g_power_control.faultLockout = 0U;
+    g_power_control.faultStatus = 0U;
     Power_Control_Clear_Stall_Recover();
 
     current_config.kpDiv = (int32_t)POWER_CURRENT_KP_DIV;
@@ -18,8 +18,8 @@ void Power_Control_Init(void)
     voltage_config.kiDiv = (int32_t)POWER_VOLTAGE_KI_DIV;
     voltage_config.integralLimit = POWER_INTEGRAL_LIMIT;
     voltage_config.stepLimit = (int32_t)POWER_LOOP_STEP_MAX_X100;
-    Pi_Controller_Init(&s_current_pi, &current_config);
-    Pi_Controller_Init(&s_voltage_pi, &voltage_config);
+    Pi_Controller_Init(&g_power_control.currentPi, &current_config);
+    Pi_Controller_Init(&g_power_control.voltagePi, &voltage_config);
 
     Power_Control_Reset_Loop();
 
@@ -32,15 +32,15 @@ void Power_Control_Stop(void)
      * 缁熶竴鍋滄鍏ュ彛銆?
      * 鏁呴殰銆佷笂浣嶆満鍋滄鍛戒护銆佸厖鐢靛畬鎴愰兘浼氳蛋杩欓噷锛岀‘淇濊蒋浠剁姸鎬佸拰纭欢杈撳嚭涓€鑷淬€?
      */
-    s_power.enabled = 0U;
-    s_power.powerStageMode = (uint8_t)POWER_STAGE_MODE_OFF;
-    s_power.targetCurrentMa = 0U;
-    s_power.dutyX100 = 0U;
+    g_power_control.power.enabled = 0U;
+    g_power_control.power.powerStageMode = (uint8_t)POWER_STAGE_MODE_OFF;
+    g_power_control.power.targetCurrentMa = 0U;
+    g_power_control.power.dutyX100 = 0U;
     Power_Control_Set_Battery_Current_Feedback(0, 0U);
     Power_Control_Set_Battery_Voltage_Feedback(0U, 0U);
-    s_preconnect_active = 0U;
-    s_preconnect_ovp_limit_mv = 0U;
-    s_afe_handover_guard_count = 0U;
+    g_power_control.preconnectActive = 0U;
+    g_power_control.preconnectOvpLimitMv = 0U;
+    g_power_control.afeHandoverGuardCount = 0U;
     Power_Control_Clear_Stall_Recover();
     Power_Control_Reset_Loop();
 
@@ -49,32 +49,32 @@ void Power_Control_Stop(void)
 
 void Power_Control_Fault_Lockout(void)
 {
-    s_fault_lockout = 1U;
+    g_power_control.faultLockout = 1U;
     Power_Control_Stop();
 }
 
 void Power_Control_Clear_Fault_Lockout(void)
 {
-    s_fault_lockout = 0U;
+    g_power_control.faultLockout = 0U;
 }
 
 uint32_t Power_Control_Get_Fault_Status(void)
 {
-    return s_fault_status;
+    return g_power_control.faultStatus;
 }
 
 void Power_Control_Clear_Fault_Status(void)
 {
-    s_fault_status = 0U;
-    s_power.tripReason = (uint8_t)POWER_TRIP_REASON_NONE;
-    s_power.tripFaults = 0U;
-    s_power.tripIoutMa = 0;
-    s_power.tripCurrentRefMa = 0U;
-    s_power.tripOcpLimitMa = 0U;
-    s_power.tripVoutMv = 0U;
-    s_power.tripVinMv = 0U;
-    s_power.tripDutyX100 = 0U;
-    s_power.tripFaultOcActive = 0U;
+    g_power_control.faultStatus = 0U;
+    g_power_control.power.tripReason = (uint8_t)POWER_TRIP_REASON_NONE;
+    g_power_control.power.tripFaults = 0U;
+    g_power_control.power.tripIoutMa = 0;
+    g_power_control.power.tripCurrentRefMa = 0U;
+    g_power_control.power.tripOcpLimitMa = 0U;
+    g_power_control.power.tripVoutMv = 0U;
+    g_power_control.power.tripVinMv = 0U;
+    g_power_control.power.tripDutyX100 = 0U;
+    g_power_control.power.tripFaultOcActive = 0U;
 }
 
 void Power_Control_Set(uint16_t target_voltage_mv, uint16_t target_current_ma, uint8_t mode)
@@ -91,7 +91,7 @@ void Power_Control_Set(uint16_t target_voltage_mv, uint16_t target_current_ma, u
      * 姣?20 ms 浼氶噸澶嶈皟鐢ㄦ湰鍑芥暟锛屾鏃跺彧鏇存柊鐩爣锛屼笉娓呯┖鐜矾鍘嗗彶銆?
      */
     target_voltage_mv = Power_Control_Clamp_Charge_Target_Mv(target_voltage_mv, mode);
-    if(s_fault_lockout != 0U || s_fault_status != 0U) {
+    if(g_power_control.faultLockout != 0U || g_power_control.faultStatus != 0U) {
         Power_Control_Stop();
         return;
     }
@@ -100,12 +100,12 @@ void Power_Control_Set(uint16_t target_voltage_mv, uint16_t target_current_ma, u
         return;
     }
 
-    was_enabled = s_power.enabled;
-    was_preconnect = s_preconnect_active;
-    previous_target_voltage_mv = s_power.targetVoltageMv;
+    was_enabled = g_power_control.power.enabled;
+    was_preconnect = g_power_control.preconnectActive;
+    previous_target_voltage_mv = g_power_control.power.targetVoltageMv;
     target_changed = ((was_enabled != 0U) &&
-                      ((s_power.targetVoltageMv != target_voltage_mv) ||
-                       (s_power.mode != mode))) ? 1U : 0U;
+                      ((g_power_control.power.targetVoltageMv != target_voltage_mv) ||
+                       (g_power_control.power.mode != mode))) ? 1U : 0U;
     if((was_enabled != 0U) &&
        (was_preconnect != 0U) &&
        (target_voltage_mv >= previous_target_voltage_mv)) {
@@ -118,31 +118,31 @@ void Power_Control_Set(uint16_t target_voltage_mv, uint16_t target_current_ma, u
      */
     if((was_enabled != 0U) &&
        (mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
-       (s_power.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) {
+       (g_power_control.power.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER)) {
         target_changed = 0U;
     }
     allow_ovp_blank = ((was_enabled == 0U) ||
-                       (s_power.mode != mode) ||
-                       (target_voltage_mv > s_power.targetVoltageMv)) ? 1U : 0U;
-    s_preconnect_active = 0U;
-    s_preconnect_ovp_limit_mv = 0U;
+                       (g_power_control.power.mode != mode) ||
+                       (target_voltage_mv > g_power_control.power.targetVoltageMv)) ? 1U : 0U;
+    g_power_control.preconnectActive = 0U;
+    g_power_control.preconnectOvpLimitMv = 0U;
     if(mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) {
-        s_afe_handover_guard_count = 0U;
+        g_power_control.afeHandoverGuardCount = 0U;
     }
-    s_power.mode = mode;
-    s_power.targetVoltageMv = target_voltage_mv;
-    s_power.targetCurrentMa = target_current_ma;
+    g_power_control.power.mode = mode;
+    g_power_control.power.targetVoltageMv = target_voltage_mv;
+    g_power_control.power.targetCurrentMa = target_current_ma;
 
     if((was_enabled == 0U) || (target_changed != 0U)) {
         Power_Control_Reset_Loop();
         if(allow_ovp_blank == 0U) {
-            s_output_ovp_blank_count = 0U;
+            g_power_control.outputOvpBlankCount = 0U;
         }
-        s_power.dutyX100 = POWER_START_DUTY_X100;
+        g_power_control.power.dutyX100 = POWER_START_DUTY_X100;
     }
-    s_power.enabled = 1U;
+    g_power_control.power.enabled = 1U;
 
-    if(s_fault_lockout == 0U && s_fault_status == 0U) {
+    if(g_power_control.faultLockout == 0U && g_power_control.faultStatus == 0U) {
         Power_Control_Pwm_Apply();
         Power_Control_Pwm_Enable();
     } else {
@@ -155,10 +155,10 @@ void Power_Control_Set_Preconnect(uint16_t target_voltage_mv,
                                   uint16_t ovp_limit_mv)
 {
     Power_Control_Set(target_voltage_mv, target_current_ma, (uint8_t)BMS_CHARGE_MODE_CV);
-    if(s_power.enabled != 0U) {
-        s_preconnect_active = 1U;
-        s_preconnect_ovp_limit_mv = ovp_limit_mv;
-        s_afe_handover_guard_count = 0U;
+    if(g_power_control.power.enabled != 0U) {
+        g_power_control.preconnectActive = 1U;
+        g_power_control.preconnectOvpLimitMv = ovp_limit_mv;
+        g_power_control.afeHandoverGuardCount = 0U;
     }
 }
 
@@ -169,12 +169,12 @@ void Power_Control_Set_Afe_Handover(uint16_t target_voltage_mv,
 {
     uint16_t previous_boost_duty_x100;
 
-    previous_boost_duty_x100 = s_boost_duty_x100;
+    previous_boost_duty_x100 = g_power_control.boostDutyX100;
     Power_Control_Set(target_voltage_mv, target_current_ma, mode);
-    if(s_power.enabled != 0U) {
-        s_preconnect_active = 0U;
-        s_preconnect_ovp_limit_mv = 0U;
-        s_afe_handover_guard_count = BMS_POWER_AFE_HANDOVER_GUARD_CYCLES;
+    if(g_power_control.power.enabled != 0U) {
+        g_power_control.preconnectActive = 0U;
+        g_power_control.preconnectOvpLimitMv = 0U;
+        g_power_control.afeHandoverGuardCount = BMS_POWER_AFE_HANDOVER_GUARD_CYCLES;
         Power_Control_Clear_Stall_Recover();
         Power_Control_Reset_Loop();
         Power_Control_Afe_Handover_Start_Output(sample, previous_boost_duty_x100);
@@ -186,22 +186,22 @@ void Power_Control_Set_Afe_Handover(uint16_t target_voltage_mv,
 void Power_Control_Set_Battery_Current_Feedback(int16_t current_ma, uint8_t valid)
 {
     if(valid != 0U) {
-        s_battery_current_feedback_ma = current_ma;
-        s_battery_current_feedback_valid = 1U;
+        g_power_control.batteryCurrentFeedbackMa = current_ma;
+        g_power_control.batteryCurrentFeedbackValid = 1U;
     } else {
-        s_battery_current_feedback_valid = 0U;
-        s_battery_current_feedback_ma = 0;
+        g_power_control.batteryCurrentFeedbackValid = 0U;
+        g_power_control.batteryCurrentFeedbackMa = 0;
     }
 }
 
 void Power_Control_Set_Battery_Voltage_Feedback(uint16_t pack_voltage_mv, uint8_t valid)
 {
     if(valid != 0U && pack_voltage_mv != 0U) {
-        s_battery_voltage_feedback_mv = pack_voltage_mv;
-        s_battery_voltage_feedback_valid = 1U;
+        g_power_control.batteryVoltageFeedbackMv = pack_voltage_mv;
+        g_power_control.batteryVoltageFeedbackValid = 1U;
     } else {
-        s_battery_voltage_feedback_valid = 0U;
-        s_battery_voltage_feedback_mv = 0U;
+        g_power_control.batteryVoltageFeedbackValid = 0U;
+        g_power_control.batteryVoltageFeedbackMv = 0U;
     }
 }
 
@@ -215,7 +215,7 @@ static void Power_Control_Latch_Fault(uint8_t reason,
     }
 
     Power_Control_Record_Trip(reason, faults, sample, current_ref_ma);
-    s_fault_status |= faults;
+    g_power_control.faultStatus |= faults;
     Power_Control_Fault_Lockout();
 }
 
@@ -235,13 +235,13 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
         return;
     }
 
-    if(s_fault_lockout != 0U) {
+    if(g_power_control.faultLockout != 0U) {
         Power_Control_Stop();
         return;
     }
 
-    if(s_power.enabled == 0U) {
-        s_power.dutyX100 = 0U;
+    if(g_power_control.power.enabled == 0U) {
+        g_power_control.power.dutyX100 = 0U;
         Power_Pwm_Outputs_Disable();
         return;
     }
@@ -250,7 +250,7 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
         Power_Control_Latch_Fault((uint8_t)POWER_TRIP_REASON_SAMPLE_FAULT,
                                   sample->faultBitmap,
                                   sample,
-                                  s_soft_current_ma);
+                                  g_power_control.softCurrentMa);
         return;
     }
 
@@ -259,12 +259,12 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
         Power_Control_Latch_Fault((uint8_t)POWER_TRIP_REASON_FAULT_OC_PIN,
                                   BMS_FAULT_CHARGE_OCP,
                                   sample,
-                                  s_soft_current_ma);
+                                  g_power_control.softCurrentMa);
         return;
     }
 #endif
 
-    if(s_power.targetCurrentMa == 0U) {
+    if(g_power_control.power.targetCurrentMa == 0U) {
         Power_Control_Stop();
         return;
     }
@@ -274,13 +274,13 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
         Power_Control_Latch_Fault((uint8_t)POWER_TRIP_REASON_INPUT_UV,
                                   BMS_FAULT_INPUT_UV,
                                   sample,
-                                  s_soft_current_ma);
+                                  g_power_control.softCurrentMa);
         return;
     }
 #endif
 
     if(Power_Control_Output_Ovp_Confirmed(sample->outputVoltageMv) != 0U) {
-        if(s_preconnect_active != 0U) {
+        if(g_power_control.preconnectActive != 0U) {
             Power_Control_Preconnect_Coast();
             Power_Control_Pwm_Apply();
             Power_Control_Pwm_Enable();
@@ -291,7 +291,7 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
          * 鏁板瓧鐢垫簮璋冧綆杈撳嚭鏃?Vout 浼氭殏鏃堕珮浜庢柊鐩爣銆傝蒋 OVP 鍖哄彧婊戣娉勬斁锛?
          * 璁╃數鍘嬬幆鎶?Vout 鎷夊洖鏂拌瀹氬€硷紱鍙湁瓒呰繃纭檺鎵嶉攣鏁呴殰銆?
          */
-        if((s_power.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
+        if((g_power_control.power.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
            (Power_Control_Output_Over_Hard_Limit(sample->outputVoltageMv) == 0U)) {
             Power_Control_Preconnect_Coast();
             Power_Control_Pwm_Apply();
@@ -301,7 +301,7 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
         Power_Control_Latch_Fault((uint8_t)POWER_TRIP_REASON_OUTPUT_OVP,
                                   BMS_FAULT_PACK_OVP,
                                   sample,
-                                  s_soft_current_ma);
+                                  g_power_control.softCurrentMa);
         return;
     }
 
@@ -319,7 +319,7 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
 
     output_current_ma = Power_Control_Positive_Output_Current_Ma(sample);
     measured_current_ma = Power_Control_Current_Feedback_Ma(sample);
-    current_ref_ma = Power_Control_Ramp_Current(s_power.targetCurrentMa);
+    current_ref_ma = Power_Control_Ramp_Current(g_power_control.power.targetCurrentMa);
     if(Power_Control_Output_Ocp_Confirmed(output_current_ma, current_ref_ma) != 0U) {
         Power_Control_Latch_Fault((uint8_t)POWER_TRIP_REASON_OUTPUT_OCP_SOFTWARE,
                                   BMS_FAULT_CHARGE_OCP,
@@ -341,24 +341,24 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
         Power_Control_Light_Load_Near_Target(sample, current_ref_ma, measured_current_ma);
 
     if(voltage_loop_active != 0U) {
-        error = (int32_t)s_power.targetVoltageMv - (int32_t)sample->outputVoltageMv;
-        step = Pi_Controller_Update(&s_voltage_pi, error);
+        error = (int32_t)g_power_control.power.targetVoltageMv - (int32_t)sample->outputVoltageMv;
+        step = Pi_Controller_Update(&g_power_control.voltagePi, error);
         if(light_load_guard_active != 0U) {
-            Pi_Controller_Decay(&s_current_pi, 1U, 2U);
+            Pi_Controller_Decay(&g_power_control.currentPi, 1U, 2U);
         } else {
-            Pi_Controller_Decay(&s_current_pi, 7U, 8U);
+            Pi_Controller_Decay(&g_power_control.currentPi, 7U, 8U);
         }
     } else {
         error = (int32_t)current_ref_ma - (int32_t)measured_current_ma;
-        step = Pi_Controller_Update(&s_current_pi, error);
-        Pi_Controller_Decay(&s_voltage_pi, 7U, 8U);
+        step = Pi_Controller_Update(&g_power_control.currentPi, error);
+        Pi_Controller_Decay(&g_power_control.voltagePi, 7U, 8U);
     }
 
     step = Power_Control_Limit_Light_Load_Step(sample,
                                                current_ref_ma,
                                                measured_current_ma,
                                                step);
-    duty = (int32_t)s_power.dutyX100 + step;
+    duty = (int32_t)g_power_control.power.dutyX100 + step;
     if(duty < (int32_t)POWER_DUTY_MIN_X100) {
         duty = (int32_t)POWER_DUTY_MIN_X100;
     } else if(duty > (int32_t)POWER_LOOP_DUTY_MAX_X100) {
@@ -374,13 +374,13 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
     duty = Power_Control_Limit_Battery_Boost_Duty(sample, duty);
     duty = Power_Control_Limit_Afe_Handover_Duty(sample, duty);
 
-    s_power.dutyX100 = (uint16_t)duty;
-    s_power.dutyX100 = Clamp_U16(s_power.dutyX100, POWER_DUTY_MIN_X100, POWER_LOOP_DUTY_MAX_X100);
-    Power_Map_Control_To_Pwm(sample, s_power.dutyX100);
-    s_async_boost_rectifier =
+    g_power_control.power.dutyX100 = (uint16_t)duty;
+    g_power_control.power.dutyX100 = Clamp_U16(g_power_control.power.dutyX100, POWER_DUTY_MIN_X100, POWER_LOOP_DUTY_MAX_X100);
+    Power_Map_Control_To_Pwm(sample, g_power_control.power.dutyX100);
+    g_power_control.asyncBoostRectifier =
         Power_Control_Async_Boost_Should_Run(current_ref_ma, measured_current_ma);
 
-    if(s_fault_lockout != 0U) {
+    if(g_power_control.faultLockout != 0U) {
         Power_Control_Stop();
         return;
     }
@@ -402,15 +402,15 @@ void Power_Control_Get_State(power_control_state_t *state)
         return;
     }
 
-    *state = s_power;
-    state->buckDutyX100 = s_buck_duty_x100;
-    state->boostLowDutyX100 = s_boost_duty_x100;
-    state->faultLockout = s_fault_lockout;
-    state->faultBitmap = s_fault_status;
-    state->preconnectActive = s_preconnect_active;
-    state->preconnectOvpLimitMv = s_preconnect_ovp_limit_mv;
-    state->softCurrentMa = s_soft_current_ma;
-    state->asyncBoostRectifier = s_async_boost_rectifier;
+    *state = g_power_control.power;
+    state->buckDutyX100 = g_power_control.buckDutyX100;
+    state->boostLowDutyX100 = g_power_control.boostDutyX100;
+    state->faultLockout = g_power_control.faultLockout;
+    state->faultBitmap = g_power_control.faultStatus;
+    state->preconnectActive = g_power_control.preconnectActive;
+    state->preconnectOvpLimitMv = g_power_control.preconnectOvpLimitMv;
+    state->softCurrentMa = g_power_control.softCurrentMa;
+    state->asyncBoostRectifier = g_power_control.asyncBoostRectifier;
     {
         power_pwm_state_t pwm_state;
 

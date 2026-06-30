@@ -35,16 +35,16 @@ void Charge_Manager_Update(uint32_t period_ms,
     }
 
     taskENTER_CRITICAL();
-    params = s_params;
-    state = s_state;
-    run_request = s_run_request;
-    mode = s_mode;
-    work_mode = s_work_mode;
-    digital_power_enabled = s_digital_power_enabled;
-    manual_fet_active = s_manual_fet_active;
-    manual_fet_mask = s_manual_fet_mask;
-    digital_power_target_voltage_mv = s_digital_power_target_voltage_mv;
-    digital_power_current_limit_ma = s_digital_power_current_limit_ma;
+    params = g_charge_manager.params;
+    state = g_charge_manager.state;
+    run_request = g_charge_manager.runRequest;
+    mode = g_charge_manager.mode;
+    work_mode = g_charge_manager.workMode;
+    digital_power_enabled = g_charge_manager.digitalPowerEnabled;
+    manual_fet_active = g_charge_manager.manualFetActive;
+    manual_fet_mask = g_charge_manager.manualFetMask;
+    digital_power_target_voltage_mv = g_charge_manager.digitalPowerTargetVoltageMv;
+    digital_power_current_limit_ma = g_charge_manager.digitalPowerCurrentLimitMa;
     taskEXIT_CRITICAL();
 
     power_requested = ((run_request != 0U) || (digital_power_enabled != 0U)) ? 1U : 0U;
@@ -142,15 +142,15 @@ void Charge_Manager_Update(uint32_t period_ms,
                (battery_current_ma >= 0) &&
                (battery_current_ma <= (int16_t)params.cutoffCurrentMa)) {
                 /* 闇€瑕佽繛缁娆′綆鐢垫祦閲囨牱锛屾墠鍒ゅ畾鍏呯數瀹屾垚锛岄伩鍏嶅伓鍙戞姈鍔ㄨ瑙﹀彂銆?*/
-                s_cv_done_counter++;
-                if(s_cv_done_counter > CV_DONE_CONFIRM_COUNT) {
+                g_charge_manager.cvDoneCounter++;
+                if(g_charge_manager.cvDoneCounter > CV_DONE_CONFIRM_COUNT) {
                     state = BMS_CHARGE_STATE_DONE;
                     run_request = 0U;
                     Charge_Manager_Clear_Path_Settle();
                     Power_Control_Stop();
                 }
             } else {
-                s_cv_done_counter = 0U;
+                g_charge_manager.cvDoneCounter = 0U;
             }
         }
 
@@ -267,20 +267,20 @@ void Charge_Manager_Update(uint32_t period_ms,
     }
 
     taskENTER_CRITICAL();
-    s_state = state;
-    s_run_request = run_request;
-    s_digital_power_enabled = digital_power_enabled;
-    s_manual_fet_active = manual_fet_active;
-    s_manual_fet_mask = manual_fet_mask;
-    s_digital_power_target_voltage_mv = digital_power_target_voltage_mv;
-    s_digital_power_current_limit_ma = digital_power_current_limit_ma;
+    g_charge_manager.state = state;
+    g_charge_manager.runRequest = run_request;
+    g_charge_manager.digitalPowerEnabled = digital_power_enabled;
+    g_charge_manager.manualFetActive = manual_fet_active;
+    g_charge_manager.manualFetMask = manual_fet_mask;
+    g_charge_manager.digitalPowerTargetVoltageMv = digital_power_target_voltage_mv;
+    g_charge_manager.digitalPowerCurrentLimitMa = digital_power_current_limit_ma;
     if((work_mode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) &&
        (digital_power_enabled == 0U) &&
-       (s_mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
+       (g_charge_manager.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
        ((faults == 0U) || (digital_power_fault_context == 0U))) {
-        s_mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
+        g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
     } else {
-        s_mode = mode;
+        g_charge_manager.mode = mode;
     }
     taskEXIT_CRITICAL();
 }
