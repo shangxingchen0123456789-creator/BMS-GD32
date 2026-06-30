@@ -735,9 +735,14 @@
               <FilePath>..\Driver\power_control.h</FilePath>
             </File>
             <File>
-              <FileName>power_control_pwm.inc</FileName>
+              <FileName>power_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\power_pwm.c</FilePath>
+            </File>
+            <File>
+              <FileName>power_pwm.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Driver\power_control_pwm.inc</FilePath>
+              <FilePath>..\Driver\power_pwm.h</FilePath>
             </File>
             <File>
               <FileName>power_control_safety.inc</FileName>

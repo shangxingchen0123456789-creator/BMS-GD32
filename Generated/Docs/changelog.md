@@ -2,6 +2,16 @@
 
 ## 2026-06-30
 
+- Promoted the former `Driver/power_control_pwm.inc` fragment into the real
+  `Driver/power_pwm.c/.h` module.
+- Added `power_pwm.c` to the Keil Driver group as an independent compilation
+  unit, while keeping the public `power_control.h` API unchanged.
+- Removed the PWM layer's reverse include dependency on `power_control.h`;
+  `power_control` now passes only a small output context to the PWM driver.
+- Updated `Generated/Tests/run_tests.py` to require the new PWM module, reject
+  the old PWM `.inc` include path, and verify the Keil project references the
+  new files.
+
 - 拆分 `Driver/power_control.c` 内部实现，新增 `power_control_pwm.inc`、`power_control_safety.inc`、`power_control_limits.inc`、`power_control_mode.inc`、`power_control_api.inc`。
 - 保留 `power_control.c` 作为唯一编译单元和外观入口，外部 API 与 `power_control.h` 不变。
 - 新增 `Generated/Docs/power_control_split_design.md`，记录 PWM、保护、限制、模式映射和 API/快环的分片边界。

@@ -33,8 +33,9 @@ EXPECTED_FILES = [
     "Driver/power_control_api.inc",
     "Driver/power_control_limits.inc",
     "Driver/power_control_mode.inc",
-    "Driver/power_control_pwm.inc",
     "Driver/power_control_safety.inc",
+    "Driver/power_pwm.c",
+    "Driver/power_pwm.h",
     "Module/balance_manager.c",
     "Module/charge_manager.c",
     "Module/charge_manager_commands.inc",
@@ -62,7 +63,6 @@ CHARGE_MANAGER_FRAGMENTS = [
 ]
 
 POWER_CONTROL_FRAGMENTS = [
-    'power_control_pwm.inc',
     'power_control_safety.inc',
     'power_control_limits.inc',
     'power_control_mode.inc',
@@ -76,11 +76,13 @@ GENERATED_EXPECTED_FILES = [
     "Docs/charge_manager_split_design.md",
     "Docs/coding_standard.md",
     "Docs/power_control_split_design.md",
+    "Docs/power_pwm_module_design.md",
     "Docs/test_report.md",
     "Tests/run_tests.py",
     "Tests/unit/test_common_logic.c",
     "BuildLogs/codex_build_async_fix.log",
     "BuildLogs/uv4_power_control_split_rebuild_20260630.log",
+    "BuildLogs/uv4_power_pwm_module_rebuild_20260630.log",
 ]
 
 OLD_GENERATED_PATHS = [
@@ -207,6 +209,23 @@ def assert_power_control_fragments() -> None:
         last_index = index
 
 
+def assert_power_pwm_module() -> None:
+    power_control = (FW / "Driver" / "power_control.c").read_text(encoding="utf-8")
+    power_pwm = (FW / "Driver" / "power_pwm.c").read_text(encoding="utf-8")
+    project_paths = project_file_paths()
+
+    if '#include "power_control_pwm.inc"' in power_control:
+        fail("power_control.c still includes old PWM internal fragment")
+    if '#include "power_pwm.h"' not in power_control:
+        fail("power_control.c does not include power_pwm.h")
+    if '#include "power_control.h"' in power_pwm:
+        fail("power_pwm.c must not depend on power_control.h")
+    if "..\\Driver\\power_pwm.c" not in project_paths:
+        fail("Keil project does not compile power_pwm.c")
+    if "..\\Driver\\power_pwm.h" not in project_paths:
+        fail("Keil project does not list power_pwm.h")
+
+
 def assert_generated_files_grouped() -> None:
     for rel in GENERATED_EXPECTED_FILES:
         path = GENERATED / rel
@@ -271,6 +290,7 @@ def main() -> int:
         ("Keil include paths use layers", assert_keil_uses_layers),
         ("charge manager fragments included", assert_charge_manager_fragments),
         ("power control fragments included", assert_power_control_fragments),
+        ("power pwm module extracted", assert_power_pwm_module),
         ("generated files grouped", assert_generated_files_grouped),
     ]
 

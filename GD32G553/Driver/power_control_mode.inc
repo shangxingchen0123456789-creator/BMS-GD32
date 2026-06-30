@@ -116,6 +116,34 @@ static void Power_Control_Record_Trip(uint8_t reason,
     }
 }
 
+static void Power_Control_Pwm_Output_Context(power_pwm_output_context_t *context)
+{
+    if(context == 0) {
+        return;
+    }
+
+    context->faultLockout = s_fault_lockout;
+    context->faultStatus = s_fault_status;
+    context->asyncBoostRectifier = s_async_boost_rectifier;
+    context->boostStageActive =
+        (s_power.powerStageMode == (uint8_t)POWER_STAGE_MODE_BOOST) ? 1U : 0U;
+    context->boostLowDutyX100 = s_boost_duty_x100;
+    context->preconnectActive = s_preconnect_active;
+}
+
+static void Power_Control_Pwm_Apply(void)
+{
+    Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100, s_fault_lockout);
+}
+
+static void Power_Control_Pwm_Enable(void)
+{
+    power_pwm_output_context_t context;
+
+    Power_Control_Pwm_Output_Context(&context);
+    Power_Pwm_Outputs_Enable(&context);
+}
+
 static void Power_Map_Control_To_Pwm(const bms_power_sample_t *sample, uint16_t control_x100)
 {
     uint16_t buck_duty;

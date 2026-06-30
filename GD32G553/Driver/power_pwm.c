@@ -1,3 +1,14 @@
+#include "power_pwm.h"
+
+#include "bms_board_config.h"
+#include "system_gd32g5x3.h"
+
+#define POWER_USE_HARDWARE_PWM                 BMS_ENABLE_HRTIMER_PWM
+#define POWER_DUTY_MIN_X100                    BMS_PWM_DUTY_MIN_X100
+#define POWER_DUTY_MAX_X100                    BMS_PWM_DUTY_MAX_X100
+#define POWER_PWM_COMPARE_GUARD_TICKS          3U
+#define POWER_PWM_DEADTIME_CLOCK_MUL           32U
+
 #if POWER_USE_HARDWARE_PWM
 static uint8_t s_pwm_ready;
 static uint8_t s_pwm_outputs_on;
@@ -13,6 +24,17 @@ static uint32_t Power_Clamp_U32(uint32_t value, uint32_t min_value, uint32_t max
         return max_value;
     }
 
+    return value;
+}
+
+static uint16_t Power_Clamp_U16(uint16_t value, uint16_t min_value, uint16_t max_value)
+{
+    if(value < min_value) {
+        return min_value;
+    }
+    if(value > max_value) {
+        return max_value;
+    }
     return value;
 }
 
@@ -119,7 +141,7 @@ static uint32_t Power_Pwm_Compare_From_Duty(uint16_t duty_x100)
      * compare 不能等于 0 或 period，否则可能出现极窄脉冲或寄存器边界行为，
      * 因此最终再留出 3 tick 的保护余量。
      */
-    duty_x100 = Clamp_U16(duty_x100, POWER_DUTY_MIN_X100, POWER_DUTY_MAX_X100);
+    duty_x100 = Power_Clamp_U16(duty_x100, POWER_DUTY_MIN_X100, POWER_DUTY_MAX_X100);
     compare = (s_pwm_period_ticks * (uint32_t)duty_x100) / 10000U;
     compare = Power_Clamp_U32(compare,
                               Power_Pwm_Duty_Compare_Min_Ticks(),
@@ -292,10 +314,12 @@ static uint16_t Power_Complementary_High_Duty(uint16_t low_duty_x100)
         return POWER_DUTY_MIN_X100;
     }
 
-    return Clamp_U16((uint16_t)(10000U - low_duty_x100), POWER_DUTY_MIN_X100, POWER_DUTY_MAX_X100);
+    return Power_Clamp_U16((uint16_t)(10000U - low_duty_x100), POWER_DUTY_MIN_X100, POWER_DUTY_MAX_X100);
 }
 
-static void Power_Pwm_Apply(uint16_t buck_duty_x100, uint16_t boost_low_duty_x100)
+void Power_Pwm_Apply(uint16_t buck_duty_x100,
+                     uint16_t boost_low_duty_x100,
+                     uint8_t fault_lockout)
 {
     uint16_t buck_high_duty;
     uint16_t boost_high_duty;
@@ -304,7 +328,7 @@ static void Power_Pwm_Apply(uint16_t buck_duty_x100, uint16_t boost_low_duty_x10
     uint32_t buck_low_set_compare;
     uint32_t boost_low_set_compare;
 
-    if(s_pwm_ready == 0U || s_fault_lockout != 0U) {
+    if(s_pwm_ready == 0U || fault_lockout != 0U) {
         return;
     }
 
@@ -313,7 +337,7 @@ static void Power_Pwm_Apply(uint16_t buck_duty_x100, uint16_t boost_low_duty_x10
      * Buck 半桥直接使用 buck_duty_x100；Boost 半桥的控制量表示低边
      * 储能占空比，因此这里取互补值写入高边比较寄存器。
      */
-    buck_high_duty = Clamp_U16(buck_duty_x100, POWER_DUTY_MIN_X100, POWER_DUTY_MAX_X100);
+    buck_high_duty = Power_Clamp_U16(buck_duty_x100, POWER_DUTY_MIN_X100, POWER_DUTY_MAX_X100);
     boost_high_duty = Power_Complementary_High_Duty(boost_low_duty_x100);
 
     buck_compare = Power_Pwm_Compare_From_Duty(buck_high_duty);
@@ -328,20 +352,24 @@ static void Power_Pwm_Apply(uint16_t buck_duty_x100, uint16_t boost_low_duty_x10
     hrtimer_software_update(BMS_HRTIMER_PERIPH, HRTIMER_UPDATE_SW_ST0 | HRTIMER_UPDATE_SW_ST1);
 }
 
-static uint32_t Power_Pwm_Active_Output_Channels(void)
+static uint32_t Power_Pwm_Active_Output_Channels(const power_pwm_output_context_t *context)
 {
     uint32_t channels;
 
     channels = BMS_PWM_OUTPUT_CHANNELS;
-    if((s_async_boost_rectifier != 0U) &&
-       (s_power.powerStageMode == (uint8_t)POWER_STAGE_MODE_BOOST) &&
-       (s_boost_duty_x100 == 0U)) {
-        if(s_preconnect_active == 0U) {
+    if(context == 0) {
+        return 0U;
+    }
+
+    if((context->asyncBoostRectifier != 0U) &&
+       (context->boostStageActive != 0U) &&
+       (context->boostLowDutyX100 == 0U)) {
+        if(context->preconnectActive == 0U) {
             return 0U;
         }
     }
 
-    if(s_async_boost_rectifier != 0U) {
+    if(context->asyncBoostRectifier != 0U) {
         channels &= ~((uint32_t)HRTIMER_ST1_CH0);
     }
 
@@ -357,10 +385,14 @@ static uint8_t Power_Pwm_Fault_Pin_Active(void)
 #endif
 }
 
-static void Power_Pwm_Clear_Recovered_Fault(void)
+static void Power_Pwm_Clear_Recovered_Fault(const power_pwm_output_context_t *context)
 {
 #if BMS_ENABLE_POWER_FAULT_PIN
-    if((s_pwm_ready == 0U) || (s_fault_lockout != 0U) || (s_fault_status != 0U)) {
+    if(context == 0) {
+        return;
+    }
+
+    if((s_pwm_ready == 0U) || (context->faultLockout != 0U) || (context->faultStatus != 0U)) {
         return;
     }
 
@@ -375,17 +407,21 @@ static void Power_Pwm_Clear_Recovered_Fault(void)
 #endif
 }
 
-static void Power_Pwm_Outputs_Enable(void)
+void Power_Pwm_Outputs_Enable(const power_pwm_output_context_t *context)
 {
     uint32_t active_channels;
     uint32_t inactive_channels;
 
     /* 初始化完成后才允许打开输出，防止 GPIO 复用未就绪时出现毛刺。 */
-    if((s_pwm_ready != 0U) && (s_fault_lockout == 0U)) {
-        Power_Pwm_Clear_Recovered_Fault();
+    if(context == 0) {
+        return;
     }
-    if((s_pwm_ready != 0U) && (s_fault_lockout == 0U)) {
-        active_channels = Power_Pwm_Active_Output_Channels();
+
+    if((s_pwm_ready != 0U) && (context->faultLockout == 0U)) {
+        Power_Pwm_Clear_Recovered_Fault(context);
+    }
+    if((s_pwm_ready != 0U) && (context->faultLockout == 0U)) {
+        active_channels = Power_Pwm_Active_Output_Channels(context);
         inactive_channels = BMS_PWM_OUTPUT_CHANNELS & ~active_channels;
         if(active_channels != 0U) {
             hrtimer_output_channel_enable(BMS_HRTIMER_PERIPH, active_channels);
@@ -397,7 +433,7 @@ static void Power_Pwm_Outputs_Enable(void)
     }
 }
 
-static void Power_Pwm_Outputs_Disable(void)
+void Power_Pwm_Outputs_Disable(void)
 {
     /* 关闭输出只影响引脚驱动，HRTIMER 计数器仍可继续运行，便于快速恢复。 */
     if(s_pwm_ready != 0U) {
@@ -406,7 +442,7 @@ static void Power_Pwm_Outputs_Disable(void)
     }
 }
 
-uint8_t Power_Control_Wait_Adc_Sample_Point(uint32_t timeout)
+uint8_t Power_Pwm_Wait_Adc_Sample_Point(uint32_t timeout)
 {
 #if BMS_ENABLE_PWM_SYNC_ADC
     if(s_pwm_ready == 0U) {
@@ -434,7 +470,7 @@ uint8_t Power_Control_Wait_Adc_Sample_Point(uint32_t timeout)
     return 0U;
 }
 
-static void Power_Pwm_Init(void)
+void Power_Pwm_Init(void)
 {
     uint32_t timeout;
 
@@ -481,9 +517,48 @@ static void Power_Pwm_Init(void)
     s_pwm_ready = 1U;
 }
 #else
-uint8_t Power_Control_Wait_Adc_Sample_Point(uint32_t timeout)
+void Power_Pwm_Init(void)
+{
+}
+
+void Power_Pwm_Apply(uint16_t buck_duty_x100,
+                     uint16_t boost_low_duty_x100,
+                     uint8_t fault_lockout)
+{
+    (void)buck_duty_x100;
+    (void)boost_low_duty_x100;
+    (void)fault_lockout;
+}
+
+void Power_Pwm_Outputs_Enable(const power_pwm_output_context_t *context)
+{
+    (void)context;
+}
+
+void Power_Pwm_Outputs_Disable(void)
+{
+}
+
+uint8_t Power_Pwm_Wait_Adc_Sample_Point(uint32_t timeout)
 {
     (void)timeout;
     return 0U;
 }
 #endif
+
+void Power_Pwm_Get_State(power_pwm_state_t *state)
+{
+    if(state == 0) {
+        return;
+    }
+
+#if POWER_USE_HARDWARE_PWM
+    state->ready = s_pwm_ready;
+    state->outputsOn = s_pwm_outputs_on;
+    state->periodTicks = s_pwm_period_ticks;
+#else
+    state->ready = 0U;
+    state->outputsOn = 0U;
+    state->periodTicks = 0U;
+#endif
+}

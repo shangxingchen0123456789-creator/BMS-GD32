@@ -21,9 +21,7 @@ void Power_Control_Init(void)
 
     Power_Control_Reset_Loop();
 
-#if POWER_USE_HARDWARE_PWM
     Power_Pwm_Init();
-#endif
 }
 
 void Power_Control_Stop(void)
@@ -44,9 +42,7 @@ void Power_Control_Stop(void)
     Power_Control_Clear_Stall_Recover();
     Power_Control_Reset_Loop();
 
-#if POWER_USE_HARDWARE_PWM
     Power_Pwm_Outputs_Disable();
-#endif
 }
 
 void Power_Control_Fault_Lockout(void)
@@ -144,14 +140,12 @@ void Power_Control_Set(uint16_t target_voltage_mv, uint16_t target_current_ma, u
     }
     s_power.enabled = 1U;
 
-#if POWER_USE_HARDWARE_PWM
     if(s_fault_lockout == 0U && s_fault_status == 0U) {
-        Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100);
-        Power_Pwm_Outputs_Enable();
+        Power_Control_Pwm_Apply();
+        Power_Control_Pwm_Enable();
     } else {
         Power_Control_Stop();
     }
-#endif
 }
 
 void Power_Control_Set_Preconnect(uint16_t target_voltage_mv,
@@ -182,10 +176,8 @@ void Power_Control_Set_Afe_Handover(uint16_t target_voltage_mv,
         Power_Control_Clear_Stall_Recover();
         Power_Control_Reset_Loop();
         Power_Control_Afe_Handover_Start_Output(sample, previous_boost_duty_x100);
-#if POWER_USE_HARDWARE_PWM
-        Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100);
-        Power_Pwm_Outputs_Enable();
-#endif
+        Power_Control_Pwm_Apply();
+        Power_Control_Pwm_Enable();
     }
 }
 
@@ -248,9 +240,7 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
 
     if(s_power.enabled == 0U) {
         s_power.dutyX100 = 0U;
-#if POWER_USE_HARDWARE_PWM
         Power_Pwm_Outputs_Disable();
-#endif
         return;
     }
 
@@ -290,10 +280,8 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
     if(Power_Control_Output_Ovp_Confirmed(sample->outputVoltageMv) != 0U) {
         if(s_preconnect_active != 0U) {
             Power_Control_Preconnect_Coast();
-#if POWER_USE_HARDWARE_PWM
-            Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100);
-            Power_Pwm_Outputs_Enable();
-#endif
+            Power_Control_Pwm_Apply();
+            Power_Control_Pwm_Enable();
             Power_Control_Service_Stall_Recover(sample);
             return;
         }
@@ -304,10 +292,8 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
         if((s_power.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
            (Power_Control_Output_Over_Hard_Limit(sample->outputVoltageMv) == 0U)) {
             Power_Control_Preconnect_Coast();
-#if POWER_USE_HARDWARE_PWM
-            Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100);
-            Power_Pwm_Outputs_Enable();
-#endif
+            Power_Control_Pwm_Apply();
+            Power_Control_Pwm_Enable();
             return;
         }
         Power_Control_Latch_Fault((uint8_t)POWER_TRIP_REASON_OUTPUT_OVP,
@@ -324,10 +310,8 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
 
     if(Power_Control_Input_Guard_Active(sample) != 0U) {
         Power_Control_Reduce_Duty_For_Input_Guard(sample);
-#if POWER_USE_HARDWARE_PWM
-        Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100);
-        Power_Pwm_Outputs_Enable();
-#endif
+        Power_Control_Pwm_Apply();
+        Power_Control_Pwm_Enable();
         return;
     }
 
@@ -344,10 +328,8 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
 
     if(Power_Control_Preconnect_Coast_Should_Run(sample) != 0U) {
         Power_Control_Preconnect_Coast();
-#if POWER_USE_HARDWARE_PWM
-        Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100);
-        Power_Pwm_Outputs_Enable();
-#endif
+        Power_Control_Pwm_Apply();
+        Power_Control_Pwm_Enable();
         Power_Control_Service_Stall_Recover(sample);
         return;
     }
@@ -401,10 +383,8 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
         return;
     }
 
-#if POWER_USE_HARDWARE_PWM
-    Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100);
-    Power_Pwm_Outputs_Enable();
-#endif
+    Power_Control_Pwm_Apply();
+    Power_Control_Pwm_Enable();
     Power_Control_Afe_Handover_Decay();
     Power_Control_Service_Stall_Recover(sample);
 }
@@ -429,13 +409,17 @@ void Power_Control_Get_State(power_control_state_t *state)
     state->preconnectOvpLimitMv = s_preconnect_ovp_limit_mv;
     state->softCurrentMa = s_soft_current_ma;
     state->asyncBoostRectifier = s_async_boost_rectifier;
-#if POWER_USE_HARDWARE_PWM
-    state->hardwareReady = s_pwm_ready;
-    state->hardwareOutputsOn = s_pwm_outputs_on;
-    state->periodTicks = s_pwm_period_ticks;
-#else
-    state->hardwareReady = 0U;
-    state->hardwareOutputsOn = 0U;
-    state->periodTicks = 0U;
-#endif
+    {
+        power_pwm_state_t pwm_state;
+
+        Power_Pwm_Get_State(&pwm_state);
+        state->hardwareReady = pwm_state.ready;
+        state->hardwareOutputsOn = pwm_state.outputsOn;
+        state->periodTicks = pwm_state.periodTicks;
+    }
+}
+
+uint8_t Power_Control_Wait_Adc_Sample_Point(uint32_t timeout)
+{
+    return Power_Pwm_Wait_Adc_Sample_Point(timeout);
 }

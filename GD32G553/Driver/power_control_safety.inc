@@ -84,16 +84,12 @@ static void Power_Control_Service_Stall_Recover(const bms_power_sample_t *sample
     }
 
     s_power_stall_recover_count = 0U;
-#if POWER_USE_HARDWARE_PWM
     Power_Pwm_Outputs_Disable();
-#endif
     Power_Control_Reset_Loop();
     s_power.dutyX100 = POWER_START_DUTY_X100;
     Power_Map_Control_To_Pwm(sample, s_power.dutyX100);
-#if POWER_USE_HARDWARE_PWM
-    Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100);
-    Power_Pwm_Outputs_Enable();
-#endif
+    Power_Control_Pwm_Apply();
+    Power_Control_Pwm_Enable();
 }
 
 static uint16_t Power_Control_Output_Ovp_Margin_Mv(void)

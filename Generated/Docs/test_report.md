@@ -59,3 +59,34 @@ Program Size: Code=76832 RO-data=1896 RW-data=8 ZI-data=24600
 "..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
 Build Time Elapsed:  00:00:02
 ```
+
+## Power PWM Module Follow-up
+
+This round promotes PWM/HRTIMER output code from `power_control_pwm.inc` into
+`power_pwm.c/.h`. The validation checks that the new module exists, is
+referenced by Keil, is no longer included as a `.inc` fragment by
+`power_control.c`, and does not depend on `power_control.h`.
+
+`python Generated\Tests\run_tests.py` passed for this follow-up on 2026-06-30:
+
+```text
+PASS layer files exist
+PASS old moved paths removed
+PASS Keil FilePath entries resolve
+PASS Keil include paths use layers
+PASS charge manager fragments included
+PASS power control fragments included
+PASS power pwm module extracted
+PASS generated files grouped
+SKIP optional C unit tests: no gcc, clang, or cl found on PATH
+```
+
+Keil UV4 command-line build passed for this follow-up on 2026-06-30:
+
+```text
+compiling power_pwm.c...
+compiling power_control.c...
+Program Size: Code=76980 RO-data=1896 RW-data=8 ZI-data=24600
+"..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:02
+```

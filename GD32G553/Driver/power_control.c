@@ -2,11 +2,10 @@
 
 #include "bms_board_config.h"
 #include "pi_controller.h"
-#include "system_gd32g5x3.h"
+#include "power_pwm.h"
 
 #include <string.h>
 
-#define POWER_USE_HARDWARE_PWM                 BMS_ENABLE_HRTIMER_PWM
 #define POWER_DUTY_MIN_X100                    BMS_PWM_DUTY_MIN_X100
 #define POWER_DUTY_MAX_X100                    BMS_PWM_DUTY_MAX_X100
 #define POWER_LOOP_DUTY_MAX_X100               BMS_PWM_DUTY_MAX_X100
@@ -46,8 +45,6 @@
 #define POWER_ASYNC_BOOST_CURRENT_MAX_MA       300U
 #define POWER_ASYNC_BOOST_EXIT_CURRENT_MA      500U
 #define POWER_REGION_MARGIN_MV                 1500U
-#define POWER_PWM_COMPARE_GUARD_TICKS          3U
-#define POWER_PWM_DEADTIME_CLOCK_MUL           32U
 #define POWER_INTEGRAL_LIMIT                   200000L
 #define POWER_CURRENT_KP_DIV                   BMS_DEFAULT_CURRENT_KP_DIV
 #define POWER_CURRENT_KI_DIV                   BMS_DEFAULT_CURRENT_KI_DIV
@@ -105,11 +102,11 @@ static volatile uint32_t s_fault_status;
 static uint16_t Clamp_U16(uint16_t value, uint16_t min_value, uint16_t max_value);
 static uint16_t Power_Control_Clamp_Charge_Target_Mv(uint16_t target_voltage_mv, uint8_t mode);
 static void Power_Map_Control_To_Pwm(const bms_power_sample_t *sample, uint16_t control_x100);
+static void Power_Control_Pwm_Apply(void);
+static void Power_Control_Pwm_Enable(void);
 static uint8_t Power_Control_Afe_Handover_Active(void);
 static uint8_t Power_Control_Async_Boost_Should_Run(uint16_t current_ref_ma,
                                                     uint16_t measured_current_ma);
-
-#include "power_control_pwm.inc"
 
 #include "power_control_safety.inc"
 
