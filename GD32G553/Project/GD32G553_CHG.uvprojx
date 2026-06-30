@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>GD32G553,USE_STDPERIPH_DRIVER</Define>
               <Undefine></Undefine>
-              <IncludePath>..\Library;..\Library\Include;..\Driver;..\Comm;..\User;..\Utilities;..\FreeRTOS;..\FreeRTOS\portable;..\FreeRTOS\include</IncludePath>
+              <IncludePath>..\Library;..\Library\Include;..\App;..\BSP;..\Common;..\Config;..\Driver;..\Module;..\Service;..\User;..\Utilities;..\FreeRTOS;..\FreeRTOS\portable;..\FreeRTOS\include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -607,6 +607,86 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>App</GroupName>
+          <Files>
+            <File>
+              <FileName>app_tasks.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\app_tasks.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_tasks.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\App\app_tasks.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>BSP</GroupName>
+          <Files>
+            <File>
+              <FileName>board_support.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\board_support.c</FilePath>
+            </File>
+            <File>
+              <FileName>board_support.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\BSP\board_support.h</FilePath>
+            </File>
+            <File>
+              <FileName>bms_uart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\bms_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>bms_uart.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\BSP\bms_uart.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Common</GroupName>
+          <Files>
+            <File>
+              <FileName>bms_types.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Common\bms_types.h</FilePath>
+            </File>
+            <File>
+              <FileName>pi_controller.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Common\pi_controller.c</FilePath>
+            </File>
+            <File>
+              <FileName>pi_controller.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Common\pi_controller.h</FilePath>
+            </File>
+            <File>
+              <FileName>battery_model.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Common\battery_model.c</FilePath>
+            </File>
+            <File>
+              <FileName>battery_model.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Common\battery_model.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Config</GroupName>
+          <Files>
+            <File>
+              <FileName>bms_board_config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Config\bms_board_config.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>Driver</GroupName>
           <Files>
             <File>
@@ -635,74 +715,14 @@
               <FilePath>..\Driver\afe_gd30bm2016_regs.h</FilePath>
             </File>
             <File>
-              <FileName>app_tasks.c</FileName>
+              <FileName>flash_storage.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Driver\app_tasks.c</FilePath>
+              <FilePath>..\Driver\flash_storage.c</FilePath>
             </File>
             <File>
-              <FileName>app_tasks.h</FileName>
+              <FileName>flash_storage.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Driver\app_tasks.h</FilePath>
-            </File>
-            <File>
-              <FileName>balance_manager.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\balance_manager.c</FilePath>
-            </File>
-            <File>
-              <FileName>balance_manager.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\balance_manager.h</FilePath>
-            </File>
-            <File>
-              <FileName>bms_state.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\bms_state.c</FilePath>
-            </File>
-            <File>
-              <FileName>bms_state.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\bms_state.h</FilePath>
-            </File>
-            <File>
-              <FileName>bms_types.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\bms_types.h</FilePath>
-            </File>
-            <File>
-              <FileName>bms_board_config.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\bms_board_config.h</FilePath>
-            </File>
-            <File>
-              <FileName>board_support.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\board_support.c</FilePath>
-            </File>
-            <File>
-              <FileName>board_support.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\board_support.h</FilePath>
-            </File>
-            <File>
-              <FileName>charge_manager.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\charge_manager.c</FilePath>
-            </File>
-            <File>
-              <FileName>charge_manager.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\charge_manager.h</FilePath>
-            </File>
-            <File>
-              <FileName>power_path_manager.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\power_path_manager.c</FilePath>
-            </File>
-            <File>
-              <FileName>power_path_manager.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\power_path_manager.h</FilePath>
+              <FilePath>..\Driver\flash_storage.h</FilePath>
             </File>
             <File>
               <FileName>power_control.c</FileName>
@@ -714,120 +734,125 @@
               <FileType>5</FileType>
               <FilePath>..\Driver\power_control.h</FilePath>
             </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Module</GroupName>
+          <Files>
             <File>
-              <FileName>battery_model.c</FileName>
+              <FileName>balance_manager.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Driver\battery_model.c</FilePath>
+              <FilePath>..\Module\balance_manager.c</FilePath>
             </File>
             <File>
-              <FileName>battery_model.h</FileName>
+              <FileName>balance_manager.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Driver\battery_model.h</FilePath>
+              <FilePath>..\Module\balance_manager.h</FilePath>
             </File>
             <File>
-              <FileName>fault_log.c</FileName>
+              <FileName>charge_manager.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Driver\fault_log.c</FilePath>
+              <FilePath>..\Module\charge_manager.c</FilePath>
             </File>
             <File>
-              <FileName>fault_log.h</FileName>
+              <FileName>charge_manager.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Driver\fault_log.h</FilePath>
-            </File>
-            <File>
-              <FileName>flash_storage.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\flash_storage.c</FilePath>
-            </File>
-            <File>
-              <FileName>flash_storage.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\flash_storage.h</FilePath>
-            </File>
-            <File>
-              <FileName>param_storage.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\param_storage.c</FilePath>
-            </File>
-            <File>
-              <FileName>param_storage.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\param_storage.h</FilePath>
-            </File>
-            <File>
-              <FileName>pi_controller.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\pi_controller.c</FilePath>
-            </File>
-            <File>
-              <FileName>pi_controller.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\pi_controller.h</FilePath>
+              <FilePath>..\Module\charge_manager.h</FilePath>
             </File>
             <File>
               <FileName>power_manager.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Driver\power_manager.c</FilePath>
+              <FilePath>..\Module\power_manager.c</FilePath>
             </File>
             <File>
               <FileName>power_manager.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Driver\power_manager.h</FilePath>
+              <FilePath>..\Module\power_manager.h</FilePath>
             </File>
             <File>
-              <FileName>safety_manager.c</FileName>
+              <FileName>power_path_manager.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Driver\safety_manager.c</FilePath>
+              <FilePath>..\Module\power_path_manager.c</FilePath>
             </File>
             <File>
-              <FileName>safety_manager.h</FileName>
+              <FileName>power_path_manager.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Driver\safety_manager.h</FilePath>
+              <FilePath>..\Module\power_path_manager.h</FilePath>
             </File>
             <File>
               <FileName>soc_estimator.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Driver\soc_estimator.c</FilePath>
+              <FilePath>..\Module\soc_estimator.c</FilePath>
             </File>
             <File>
               <FileName>soc_estimator.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Driver\soc_estimator.h</FilePath>
+              <FilePath>..\Module\soc_estimator.h</FilePath>
             </File>
           </Files>
         </Group>
         <Group>
-          <GroupName>Comm</GroupName>
+          <GroupName>Service</GroupName>
           <Files>
             <File>
               <FileName>bms_comm_service.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Comm\bms_comm_service.c</FilePath>
+              <FilePath>..\Service\bms_comm_service.c</FilePath>
             </File>
             <File>
               <FileName>bms_comm_service.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Comm\bms_comm_service.h</FilePath>
+              <FilePath>..\Service\bms_comm_service.h</FilePath>
             </File>
             <File>
               <FileName>bms_protocol.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Comm\bms_protocol.c</FilePath>
+              <FilePath>..\Service\bms_protocol.c</FilePath>
             </File>
             <File>
               <FileName>bms_protocol.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Comm\bms_protocol.h</FilePath>
+              <FilePath>..\Service\bms_protocol.h</FilePath>
             </File>
             <File>
-              <FileName>bms_uart.c</FileName>
+              <FileName>bms_state.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Comm\bms_uart.c</FilePath>
+              <FilePath>..\Service\bms_state.c</FilePath>
             </File>
             <File>
-              <FileName>bms_uart.h</FileName>
+              <FileName>bms_state.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Comm\bms_uart.h</FilePath>
+              <FilePath>..\Service\bms_state.h</FilePath>
+            </File>
+            <File>
+              <FileName>fault_log.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Service\fault_log.c</FilePath>
+            </File>
+            <File>
+              <FileName>fault_log.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Service\fault_log.h</FilePath>
+            </File>
+            <File>
+              <FileName>param_storage.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Service\param_storage.c</FilePath>
+            </File>
+            <File>
+              <FileName>param_storage.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Service\param_storage.h</FilePath>
+            </File>
+            <File>
+              <FileName>safety_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Service\safety_manager.c</FilePath>
+            </File>
+            <File>
+              <FileName>safety_manager.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Service\safety_manager.h</FilePath>
             </File>
           </Files>
         </Group>
