@@ -242,3 +242,40 @@ Program Size: Code=76724 RO-data=1896 RW-data=8 ZI-data=24592
 "..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
 Build Time Elapsed:  00:00:06
 ```
+
+## Power Fast Loop Helpers Follow-up
+
+This round keeps `Power_Control_Fast_Loop` as the public fast-loop entry point
+but splits its internal work into private helpers for protection exits, current
+preparation, PI update, duty limiting, PWM mapping, and final recovery service.
+
+`python Generated\Tests\run_tests.py` passed for this follow-up on 2026-06-30:
+
+```text
+PASS layer files exist
+PASS old moved paths removed
+PASS Keil FilePath entries resolve
+PASS Keil include paths use layers
+PASS no inc files remain
+PASS real internal modules referenced
+PASS internal context access is explicit
+PASS internal contexts are grouped
+PASS power pwm module extracted
+PASS charge update uses helpers
+PASS power fast loop uses helpers
+PASS generated files grouped
+SKIP optional C unit tests: no gcc, clang, or cl found on PATH
+```
+
+Keil UV4 command-line rebuild passed for this follow-up on 2026-06-30:
+
+```text
+compiling power_control_safety.c...
+compiling power_control_api.c...
+compiling power_control_limits.c...
+compiling power_control_mode.c...
+compiling power_pwm.c...
+Program Size: Code=76988 RO-data=1896 RW-data=8 ZI-data=24592
+"..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:06
+```

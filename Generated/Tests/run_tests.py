@@ -83,6 +83,7 @@ GENERATED_EXPECTED_FILES = [
     "Docs/coding_standard.md",
     "Docs/internal_context_access_design.md",
     "Docs/internal_context_split_design.md",
+    "Docs/power_fast_loop_helpers_design.md",
     "Docs/power_control_split_design.md",
     "Docs/power_pwm_module_design.md",
     "Docs/remove_inc_modules_design.md",
@@ -96,6 +97,7 @@ GENERATED_EXPECTED_FILES = [
     "BuildLogs/uv4_internal_context_access_rebuild_20260630.log",
     "BuildLogs/uv4_internal_context_split_rebuild_20260630.log",
     "BuildLogs/uv4_charge_update_helpers_rebuild_20260630.log",
+    "BuildLogs/uv4_power_fast_loop_helpers_rebuild_20260630.log",
 ]
 
 OLD_GENERATED_PATHS = [
@@ -329,6 +331,32 @@ def assert_charge_update_uses_helpers() -> None:
         fail("Charge_Manager_Update orchestration body grew too long")
 
 
+def assert_power_fast_loop_uses_helpers() -> None:
+    source = (FW / "Driver" / "power_control_api.c").read_text(encoding="utf-8")
+    required_helpers = [
+        "Power_Control_Fast_Loop_Precheck",
+        "Power_Control_Fast_Loop_Prepare_Current",
+        "Power_Control_Fast_Loop_Update_Pi",
+        "Power_Control_Fast_Loop_Update_Duty",
+        "Power_Control_Fast_Loop_Map_Duty",
+        "Power_Control_Fast_Loop_Finalize",
+    ]
+
+    for helper in required_helpers:
+        if source.count(helper) < 2:
+            fail(f"Power_Control_Fast_Loop helper is not defined and used: {helper}")
+
+    marker = "void Power_Control_Fast_Loop(const bms_power_sample_t *sample)"
+    apply_marker = "void Power_Control_Apply(const bms_power_sample_t *sample)"
+    update_start = source.find(marker)
+    update_end = source.find(apply_marker, update_start)
+    if update_start < 0 or update_end < 0:
+        fail("Power_Control_Fast_Loop implementation not found")
+    update_body_lines = source[update_start:update_end].splitlines()
+    if len(update_body_lines) > 35:
+        fail("Power_Control_Fast_Loop orchestration body grew too long")
+
+
 def assert_generated_files_grouped() -> None:
     for rel in GENERATED_EXPECTED_FILES:
         path = GENERATED / rel
@@ -397,6 +425,7 @@ def main() -> int:
         ("internal contexts are grouped", assert_internal_contexts_are_grouped),
         ("power pwm module extracted", assert_power_pwm_module),
         ("charge update uses helpers", assert_charge_update_uses_helpers),
+        ("power fast loop uses helpers", assert_power_fast_loop_uses_helpers),
         ("generated files grouped", assert_generated_files_grouped),
     ]
 

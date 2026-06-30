@@ -2,6 +2,11 @@
 
 ## 2026-06-30
 
+- Refactored `Power_Control_Fast_Loop` into local helpers for fast protection,
+  current preparation, PI update, duty limiting, PWM mapping, and final service.
+- Added generated tests to keep `Power_Control_Fast_Loop` as a short
+  orchestration function.
+
 - Refactored `Charge_Manager_Update` into local helper functions for context
   snapshot/load-store, mode dispatch, normal charge flow, path ownership, and
   status filling.
