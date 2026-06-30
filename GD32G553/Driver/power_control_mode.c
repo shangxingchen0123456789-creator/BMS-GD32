@@ -1,4 +1,6 @@
-static uint8_t Power_Voltage_Loop_Should_Run(const bms_power_sample_t *sample,
+#include "power_control_internal.h"
+
+uint8_t Power_Voltage_Loop_Should_Run(const bms_power_sample_t *sample,
                                              uint16_t current_ref_ma,
                                              uint16_t measured_current_ma)
 {
@@ -34,7 +36,7 @@ static uint8_t Power_Voltage_Loop_Should_Run(const bms_power_sample_t *sample,
     return 0U;
 }
 
-static uint8_t Power_Control_Async_Boost_Should_Run(uint16_t current_ref_ma,
+uint8_t Power_Control_Async_Boost_Should_Run(uint16_t current_ref_ma,
                                                     uint16_t measured_current_ma)
 {
     if(s_power.powerStageMode != (uint8_t)POWER_STAGE_MODE_BOOST) {
@@ -80,7 +82,7 @@ static uint8_t Power_Control_Async_Boost_Should_Run(uint16_t current_ref_ma,
 #endif
 }
 
-static uint16_t Power_Ocp_Limit_From_Ref(uint16_t current_ref_ma)
+uint16_t Power_Ocp_Limit_From_Ref(uint16_t current_ref_ma)
 {
     uint32_t limit;
 
@@ -92,7 +94,7 @@ static uint16_t Power_Ocp_Limit_From_Ref(uint16_t current_ref_ma)
     return (uint16_t)limit;
 }
 
-static void Power_Control_Record_Trip(uint8_t reason,
+void Power_Control_Record_Trip(uint8_t reason,
                                       uint32_t faults,
                                       const bms_power_sample_t *sample,
                                       uint16_t current_ref_ma)
@@ -116,7 +118,7 @@ static void Power_Control_Record_Trip(uint8_t reason,
     }
 }
 
-static void Power_Control_Pwm_Output_Context(power_pwm_output_context_t *context)
+void Power_Control_Pwm_Output_Context(power_pwm_output_context_t *context)
 {
     if(context == 0) {
         return;
@@ -131,12 +133,12 @@ static void Power_Control_Pwm_Output_Context(power_pwm_output_context_t *context
     context->preconnectActive = s_preconnect_active;
 }
 
-static void Power_Control_Pwm_Apply(void)
+void Power_Control_Pwm_Apply(void)
 {
     Power_Pwm_Apply(s_buck_duty_x100, s_boost_duty_x100, s_fault_lockout);
 }
 
-static void Power_Control_Pwm_Enable(void)
+void Power_Control_Pwm_Enable(void)
 {
     power_pwm_output_context_t context;
 
@@ -144,7 +146,7 @@ static void Power_Control_Pwm_Enable(void)
     Power_Pwm_Outputs_Enable(&context);
 }
 
-static void Power_Map_Control_To_Pwm(const bms_power_sample_t *sample, uint16_t control_x100)
+void Power_Map_Control_To_Pwm(const bms_power_sample_t *sample, uint16_t control_x100)
 {
     uint16_t buck_duty;
     uint16_t boost_duty;
@@ -153,12 +155,12 @@ static void Power_Map_Control_To_Pwm(const bms_power_sample_t *sample, uint16_t 
     uint32_t region_target_mv;
 
     /*
-     * 四开关非反相 Buck-Boost 的低功率调试映射：
-     * - Buck 区：输入侧 PWM，输出侧高边常通；
-     * - Boost 区：输入侧高边常通，输出侧低边 PWM；
-     * - 过渡区：两侧同时按同一控制量动作。
+     * 鍥涘紑鍏抽潪鍙嶇浉 Buck-Boost 鐨勪綆鍔熺巼璋冭瘯鏄犲皠锛?
+     * - Buck 鍖猴細杈撳叆渚?PWM锛岃緭鍑轰晶楂樿竟甯搁€氾紱
+     * - Boost 鍖猴細杈撳叆渚ч珮杈瑰父閫氾紝杈撳嚭渚т綆杈?PWM锛?
+     * - 杩囨浮鍖猴細涓や晶鍚屾椂鎸夊悓涓€鎺у埗閲忓姩浣溿€?
      *
-     * control_x100 增大时，三种模式下传递到输出侧的能量都增大。
+     * control_x100 澧炲ぇ鏃讹紝涓夌妯″紡涓嬩紶閫掑埌杈撳嚭渚х殑鑳介噺閮藉澶с€?
      */
     control_x100 = Clamp_U16(control_x100, POWER_DUTY_MIN_X100, POWER_LOOP_DUTY_MAX_X100);
 

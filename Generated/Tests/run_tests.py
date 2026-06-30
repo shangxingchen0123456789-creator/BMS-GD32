@@ -30,19 +30,21 @@ EXPECTED_FILES = [
     "Driver/afe_gd30bm2016.c",
     "Driver/flash_storage.c",
     "Driver/power_control.c",
-    "Driver/power_control_api.inc",
-    "Driver/power_control_limits.inc",
-    "Driver/power_control_mode.inc",
-    "Driver/power_control_safety.inc",
+    "Driver/power_control_api.c",
+    "Driver/power_control_internal.h",
+    "Driver/power_control_limits.c",
+    "Driver/power_control_mode.c",
+    "Driver/power_control_safety.c",
     "Driver/power_pwm.c",
     "Driver/power_pwm.h",
     "Module/balance_manager.c",
     "Module/charge_manager.c",
-    "Module/charge_manager_commands.inc",
-    "Module/charge_manager_control.inc",
-    "Module/charge_manager_faults.inc",
-    "Module/charge_manager_params.inc",
-    "Module/charge_manager_path.inc",
+    "Module/charge_manager_commands.c",
+    "Module/charge_manager_control.c",
+    "Module/charge_manager_faults.c",
+    "Module/charge_manager_internal.h",
+    "Module/charge_manager_params.c",
+    "Module/charge_manager_path.c",
     "Module/power_manager.c",
     "Module/power_path_manager.c",
     "Module/soc_estimator.c",
@@ -54,19 +56,21 @@ EXPECTED_FILES = [
     "Service/safety_manager.c",
 ]
 
-CHARGE_MANAGER_FRAGMENTS = [
-    'charge_manager_params.inc',
-    'charge_manager_path.inc',
-    'charge_manager_faults.inc',
-    'charge_manager_control.inc',
-    'charge_manager_commands.inc',
+CHARGE_MANAGER_MODULES = [
+    "Module/charge_manager_params.c",
+    "Module/charge_manager_path.c",
+    "Module/charge_manager_faults.c",
+    "Module/charge_manager_control.c",
+    "Module/charge_manager_commands.c",
+    "Module/charge_manager_internal.h",
 ]
 
-POWER_CONTROL_FRAGMENTS = [
-    'power_control_safety.inc',
-    'power_control_limits.inc',
-    'power_control_mode.inc',
-    'power_control_api.inc',
+POWER_CONTROL_MODULES = [
+    "Driver/power_control_safety.c",
+    "Driver/power_control_limits.c",
+    "Driver/power_control_mode.c",
+    "Driver/power_control_api.c",
+    "Driver/power_control_internal.h",
 ]
 
 GENERATED_EXPECTED_FILES = [
@@ -77,12 +81,14 @@ GENERATED_EXPECTED_FILES = [
     "Docs/coding_standard.md",
     "Docs/power_control_split_design.md",
     "Docs/power_pwm_module_design.md",
+    "Docs/remove_inc_modules_design.md",
     "Docs/test_report.md",
     "Tests/run_tests.py",
     "Tests/unit/test_common_logic.c",
     "BuildLogs/codex_build_async_fix.log",
     "BuildLogs/uv4_power_control_split_rebuild_20260630.log",
     "BuildLogs/uv4_power_pwm_module_rebuild_20260630.log",
+    "BuildLogs/uv4_remove_inc_modules_rebuild_20260630.log",
 ]
 
 OLD_GENERATED_PATHS = [
@@ -183,41 +189,42 @@ def assert_keil_uses_layers() -> None:
             fail(f"Keil project still references old moved path: {token}")
 
 
-def assert_charge_manager_fragments() -> None:
-    source = (FW / "Module" / "charge_manager.c").read_text(encoding="utf-8")
-    last_index = -1
-    for fragment in CHARGE_MANAGER_FRAGMENTS:
-        token = f'#include "{fragment}"'
-        index = source.find(token)
-        if index < 0:
-            fail(f"charge_manager.c missing internal fragment include: {fragment}")
-        if index <= last_index:
-            fail(f"charge_manager internal fragment order is wrong near: {fragment}")
-        last_index = index
+def assert_no_inc_files() -> None:
+    inc_files = list(FW.rglob("*.inc"))
+    if inc_files:
+        fail("project still contains .inc files: " + ", ".join(str(path) for path in inc_files))
 
 
-def assert_power_control_fragments() -> None:
-    source = (FW / "Driver" / "power_control.c").read_text(encoding="utf-8")
-    last_index = -1
-    for fragment in POWER_CONTROL_FRAGMENTS:
-        token = f'#include "{fragment}"'
-        index = source.find(token)
-        if index < 0:
-            fail(f"power_control.c missing internal fragment include: {fragment}")
-        if index <= last_index:
-            fail(f"power_control internal fragment order is wrong near: {fragment}")
-        last_index = index
+def assert_real_internal_modules() -> None:
+    paths = project_file_paths()
+    project_tokens = {path.replace("/", "\\") for path in paths}
+    project_text = PROJECT_FILE.read_text(encoding="utf-8")
+
+    if ".inc" in project_text:
+        fail("Keil project still references .inc files")
+
+    for rel in POWER_CONTROL_MODULES + CHARGE_MANAGER_MODULES:
+        project_rel = "..\\" + rel.replace("/", "\\")
+        if project_rel not in project_tokens:
+            fail(f"Keil project missing module: {project_rel}")
+
+    for source_path in list((FW / "Driver").glob("power_control*.c")) + \
+                       list((FW / "Module").glob("charge_manager*.c")):
+        source = source_path.read_text(encoding="utf-8")
+        if ".inc" in source:
+            fail(f"source still references .inc: {source_path}")
 
 
 def assert_power_pwm_module() -> None:
     power_control = (FW / "Driver" / "power_control.c").read_text(encoding="utf-8")
+    power_control_internal = (FW / "Driver" / "power_control_internal.h").read_text(encoding="utf-8")
     power_pwm = (FW / "Driver" / "power_pwm.c").read_text(encoding="utf-8")
     project_paths = project_file_paths()
 
-    if '#include "power_control_pwm.inc"' in power_control:
-        fail("power_control.c still includes old PWM internal fragment")
-    if '#include "power_pwm.h"' not in power_control:
-        fail("power_control.c does not include power_pwm.h")
+    if ".inc" in power_control:
+        fail("power_control.c still includes an internal fragment")
+    if '#include "power_pwm.h"' not in power_control_internal:
+        fail("power_control_internal.h does not include power_pwm.h")
     if '#include "power_control.h"' in power_pwm:
         fail("power_pwm.c must not depend on power_control.h")
     if "..\\Driver\\power_pwm.c" not in project_paths:
@@ -288,8 +295,8 @@ def main() -> int:
         ("old moved paths removed", assert_old_paths_not_present),
         ("Keil FilePath entries resolve", assert_keil_paths_resolve),
         ("Keil include paths use layers", assert_keil_uses_layers),
-        ("charge manager fragments included", assert_charge_manager_fragments),
-        ("power control fragments included", assert_power_control_fragments),
+        ("no inc files remain", assert_no_inc_files),
+        ("real internal modules referenced", assert_real_internal_modules),
         ("power pwm module extracted", assert_power_pwm_module),
         ("generated files grouped", assert_generated_files_grouped),
     ]

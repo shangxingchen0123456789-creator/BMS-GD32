@@ -1,3 +1,5 @@
+#include "power_control_internal.h"
+
 void Power_Control_Init(void)
 {
     pi_controller_config_t current_config;
@@ -27,8 +29,8 @@ void Power_Control_Init(void)
 void Power_Control_Stop(void)
 {
     /*
-     * 统一停止入口。
-     * 故障、上位机停止命令、充电完成都会走这里，确保软件状态和硬件输出一致。
+     * 缁熶竴鍋滄鍏ュ彛銆?
+     * 鏁呴殰銆佷笂浣嶆満鍋滄鍛戒护銆佸厖鐢靛畬鎴愰兘浼氳蛋杩欓噷锛岀‘淇濊蒋浠剁姸鎬佸拰纭欢杈撳嚭涓€鑷淬€?
      */
     s_power.enabled = 0U;
     s_power.powerStageMode = (uint8_t)POWER_STAGE_MODE_OFF;
@@ -84,9 +86,9 @@ void Power_Control_Set(uint16_t target_voltage_mv, uint16_t target_current_ma, u
     uint16_t previous_target_voltage_mv;
 
     /*
-     * 写入新的功率级目标。
-     * 从停止状态首次进入运行状态时，重置 PI 和软启动电流；运行过程中状态机
-     * 每 20 ms 会重复调用本函数，此时只更新目标，不清空环路历史。
+     * 鍐欏叆鏂扮殑鍔熺巼绾х洰鏍囥€?
+     * 浠庡仠姝㈢姸鎬侀娆¤繘鍏ヨ繍琛岀姸鎬佹椂锛岄噸缃?PI 鍜岃蒋鍚姩鐢垫祦锛涜繍琛岃繃绋嬩腑鐘舵€佹満
+     * 姣?20 ms 浼氶噸澶嶈皟鐢ㄦ湰鍑芥暟锛屾鏃跺彧鏇存柊鐩爣锛屼笉娓呯┖鐜矾鍘嗗彶銆?
      */
     target_voltage_mv = Power_Control_Clamp_Charge_Target_Mv(target_voltage_mv, mode);
     if(s_fault_lockout != 0U || s_fault_status != 0U) {
@@ -110,9 +112,9 @@ void Power_Control_Set(uint16_t target_voltage_mv, uint16_t target_current_ma, u
         target_changed = 0U;
     }
     /*
-     * 数字电源在运行中改设定值时不复位环路。
-     * 保持当前 duty 和 PI 历史，让电压环平滑跟踪到新目标，
-     * 而不是把 duty 砸回起始值造成 Vout 先掉再爬。
+     * 鏁板瓧鐢垫簮鍦ㄨ繍琛屼腑鏀硅瀹氬€兼椂涓嶅浣嶇幆璺€?
+     * 淇濇寔褰撳墠 duty 鍜?PI 鍘嗗彶锛岃鐢靛帇鐜钩婊戣窡韪埌鏂扮洰鏍囷紝
+     * 鑰屼笉鏄妸 duty 鐮稿洖璧峰鍊奸€犳垚 Vout 鍏堟帀鍐嶇埇銆?
      */
     if((was_enabled != 0U) &&
        (mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
@@ -286,8 +288,8 @@ void Power_Control_Fast_Loop(const bms_power_sample_t *sample)
             return;
         }
         /*
-         * 数字电源调低输出时 Vout 会暂时高于新目标。软 OVP 区只滑行泄放，
-         * 让电压环把 Vout 拉回新设定值；只有超过硬限才锁故障。
+         * 鏁板瓧鐢垫簮璋冧綆杈撳嚭鏃?Vout 浼氭殏鏃堕珮浜庢柊鐩爣銆傝蒋 OVP 鍖哄彧婊戣娉勬斁锛?
+         * 璁╃數鍘嬬幆鎶?Vout 鎷夊洖鏂拌瀹氬€硷紱鍙湁瓒呰繃纭檺鎵嶉攣鏁呴殰銆?
          */
         if((s_power.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
            (Power_Control_Output_Over_Hard_Limit(sample->outputVoltageMv) == 0U)) {

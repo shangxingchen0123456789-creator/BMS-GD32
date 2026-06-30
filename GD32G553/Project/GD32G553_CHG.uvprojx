@@ -735,6 +735,31 @@
               <FilePath>..\Driver\power_control.h</FilePath>
             </File>
             <File>
+              <FileName>power_control_internal.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\power_control_internal.h</FilePath>
+            </File>
+            <File>
+              <FileName>power_control_api.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\power_control_api.c</FilePath>
+            </File>
+            <File>
+              <FileName>power_control_safety.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\power_control_safety.c</FilePath>
+            </File>
+            <File>
+              <FileName>power_control_limits.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\power_control_limits.c</FilePath>
+            </File>
+            <File>
+              <FileName>power_control_mode.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\power_control_mode.c</FilePath>
+            </File>
+            <File>
               <FileName>power_pwm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Driver\power_pwm.c</FilePath>
@@ -743,26 +768,6 @@
               <FileName>power_pwm.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Driver\power_pwm.h</FilePath>
-            </File>
-            <File>
-              <FileName>power_control_safety.inc</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\power_control_safety.inc</FilePath>
-            </File>
-            <File>
-              <FileName>power_control_limits.inc</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\power_control_limits.inc</FilePath>
-            </File>
-            <File>
-              <FileName>power_control_mode.inc</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\power_control_mode.inc</FilePath>
-            </File>
-            <File>
-              <FileName>power_control_api.inc</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Driver\power_control_api.inc</FilePath>
             </File>
           </Files>
         </Group>
@@ -790,29 +795,34 @@
               <FilePath>..\Module\charge_manager.h</FilePath>
             </File>
             <File>
-              <FileName>charge_manager_params.inc</FileName>
+              <FileName>charge_manager_internal.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Module\charge_manager_params.inc</FilePath>
+              <FilePath>..\Module\charge_manager_internal.h</FilePath>
             </File>
             <File>
-              <FileName>charge_manager_path.inc</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Module\charge_manager_path.inc</FilePath>
+              <FileName>charge_manager_params.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Module\charge_manager_params.c</FilePath>
             </File>
             <File>
-              <FileName>charge_manager_faults.inc</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Module\charge_manager_faults.inc</FilePath>
+              <FileName>charge_manager_path.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Module\charge_manager_path.c</FilePath>
             </File>
             <File>
-              <FileName>charge_manager_control.inc</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Module\charge_manager_control.inc</FilePath>
+              <FileName>charge_manager_faults.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Module\charge_manager_faults.c</FilePath>
             </File>
             <File>
-              <FileName>charge_manager_commands.inc</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Module\charge_manager_commands.inc</FilePath>
+              <FileName>charge_manager_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Module\charge_manager_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>charge_manager_commands.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Module\charge_manager_commands.c</FilePath>
             </File>
             <File>
               <FileName>power_manager.c</FileName>

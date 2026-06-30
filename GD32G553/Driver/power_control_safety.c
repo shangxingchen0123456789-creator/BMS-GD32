@@ -1,4 +1,6 @@
-static uint16_t Clamp_U16(uint16_t value, uint16_t min_value, uint16_t max_value)
+#include "power_control_internal.h"
+
+uint16_t Clamp_U16(uint16_t value, uint16_t min_value, uint16_t max_value)
 {
     if(value < min_value) {
         return min_value;
@@ -9,7 +11,7 @@ static uint16_t Clamp_U16(uint16_t value, uint16_t min_value, uint16_t max_value
     return value;
 }
 
-static uint16_t Power_Control_Clamp_Charge_Target_Mv(uint16_t target_voltage_mv, uint8_t mode)
+uint16_t Power_Control_Clamp_Charge_Target_Mv(uint16_t target_voltage_mv, uint8_t mode)
 {
     if(mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) {
         return target_voltage_mv;
@@ -22,7 +24,7 @@ static uint16_t Power_Control_Clamp_Charge_Target_Mv(uint16_t target_voltage_mv,
     return target_voltage_mv;
 }
 
-static void Power_Control_Reset_Loop(void)
+void Power_Control_Reset_Loop(void)
 {
     Pi_Controller_Reset(&s_current_pi);
     Pi_Controller_Reset(&s_voltage_pi);
@@ -35,12 +37,12 @@ static void Power_Control_Reset_Loop(void)
     s_output_ocp_count = 0U;
 }
 
-static void Power_Control_Clear_Stall_Recover(void)
+void Power_Control_Clear_Stall_Recover(void)
 {
     s_power_stall_recover_count = 0U;
 }
 
-static uint8_t Power_Control_Output_Stalled(const bms_power_sample_t *sample)
+uint8_t Power_Control_Output_Stalled(const bms_power_sample_t *sample)
 {
     if(sample == 0) {
         return 0U;
@@ -66,7 +68,7 @@ static uint8_t Power_Control_Output_Stalled(const bms_power_sample_t *sample)
     return 1U;
 }
 
-static void Power_Control_Service_Stall_Recover(const bms_power_sample_t *sample)
+void Power_Control_Service_Stall_Recover(const bms_power_sample_t *sample)
 {
     if(s_preconnect_active != 0U || Power_Control_Afe_Handover_Active() != 0U) {
         s_power_stall_recover_count = 0U;
@@ -92,7 +94,7 @@ static void Power_Control_Service_Stall_Recover(const bms_power_sample_t *sample
     Power_Control_Pwm_Enable();
 }
 
-static uint16_t Power_Control_Output_Ovp_Margin_Mv(void)
+uint16_t Power_Control_Output_Ovp_Margin_Mv(void)
 {
     if(s_power.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) {
         return BMS_DIGITAL_POWER_OUTPUT_OVP_MARGIN_MV;
@@ -101,7 +103,7 @@ static uint16_t Power_Control_Output_Ovp_Margin_Mv(void)
     return BMS_DEFAULT_OUTPUT_OVP_MARGIN_MV;
 }
 
-static uint8_t Power_Control_Output_Ovp_Confirmed(uint16_t output_voltage_mv)
+uint8_t Power_Control_Output_Ovp_Confirmed(uint16_t output_voltage_mv)
 {
     uint32_t soft_limit_mv;
     uint32_t hard_limit_mv;
@@ -146,7 +148,7 @@ static uint8_t Power_Control_Output_Ovp_Confirmed(uint16_t output_voltage_mv)
     return (s_output_ovp_count >= BMS_OUTPUT_OVP_CONFIRM_SAMPLES) ? 1U : 0U;
 }
 
-static uint8_t Power_Control_Output_Over_Hard_Limit(uint16_t output_voltage_mv)
+uint8_t Power_Control_Output_Over_Hard_Limit(uint16_t output_voltage_mv)
 {
     uint32_t hard_limit_mv;
 
@@ -160,7 +162,7 @@ static uint8_t Power_Control_Output_Over_Hard_Limit(uint16_t output_voltage_mv)
     return ((uint32_t)output_voltage_mv > hard_limit_mv) ? 1U : 0U;
 }
 
-static uint16_t Power_Control_Ramp_Current(uint16_t target_current_ma)
+uint16_t Power_Control_Ramp_Current(uint16_t target_current_ma)
 {
     if(s_preconnect_active != 0U) {
         s_soft_current_ma = target_current_ma;
@@ -184,7 +186,7 @@ static uint16_t Power_Control_Ramp_Current(uint16_t target_current_ma)
     return s_soft_current_ma;
 }
 
-static uint16_t Power_Control_Positive_Output_Current_Ma(const bms_power_sample_t *sample)
+uint16_t Power_Control_Positive_Output_Current_Ma(const bms_power_sample_t *sample)
 {
     if((sample != 0) && (sample->outputCurrentMa > 0)) {
         return (uint16_t)sample->outputCurrentMa;
@@ -193,7 +195,7 @@ static uint16_t Power_Control_Positive_Output_Current_Ma(const bms_power_sample_
     return 0U;
 }
 
-static uint8_t Power_Control_Output_Ocp_Confirmed(uint16_t output_current_ma,
+uint8_t Power_Control_Output_Ocp_Confirmed(uint16_t output_current_ma,
                                                   uint16_t current_ref_ma)
 {
     uint32_t limit_ma;
@@ -215,7 +217,7 @@ static uint8_t Power_Control_Output_Ocp_Confirmed(uint16_t output_current_ma,
     return (s_output_ocp_count >= POWER_TRANSIENT_OCP_CONFIRM_COUNT) ? 1U : 0U;
 }
 
-static uint16_t Power_Control_Current_Feedback_Ma(const bms_power_sample_t *sample)
+uint16_t Power_Control_Current_Feedback_Ma(const bms_power_sample_t *sample)
 {
     int16_t battery_current_ma;
 

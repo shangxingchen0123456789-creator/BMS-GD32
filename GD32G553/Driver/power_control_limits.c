@@ -1,4 +1,6 @@
-static uint16_t Power_Control_Light_Load_Current_Threshold(uint16_t current_ref_ma)
+#include "power_control_internal.h"
+
+uint16_t Power_Control_Light_Load_Current_Threshold(uint16_t current_ref_ma)
 {
     uint16_t threshold;
 
@@ -13,7 +15,7 @@ static uint16_t Power_Control_Light_Load_Current_Threshold(uint16_t current_ref_
     return threshold;
 }
 
-static uint16_t Power_Control_Light_Load_Cv_Margin_Mv(void)
+uint16_t Power_Control_Light_Load_Cv_Margin_Mv(void)
 {
     if(s_preconnect_active != 0U) {
         return POWER_PRECONNECT_LIGHT_LOAD_MARGIN_MV;
@@ -22,7 +24,7 @@ static uint16_t Power_Control_Light_Load_Cv_Margin_Mv(void)
     return POWER_LIGHT_LOAD_CV_MARGIN_MV;
 }
 
-static uint8_t Power_Control_Light_Load_Near_Target(const bms_power_sample_t *sample,
+uint8_t Power_Control_Light_Load_Near_Target(const bms_power_sample_t *sample,
                                                     uint16_t current_ref_ma,
                                                     uint16_t measured_current_ma)
 {
@@ -52,7 +54,7 @@ static uint8_t Power_Control_Light_Load_Near_Target(const bms_power_sample_t *sa
     return 1U;
 }
 
-static uint16_t Power_Control_Light_Load_Duty_Max(const bms_power_sample_t *sample)
+uint16_t Power_Control_Light_Load_Duty_Max(const bms_power_sample_t *sample)
 {
     uint32_t ideal_boost_duty;
     uint32_t target_for_limit_mv;
@@ -84,7 +86,7 @@ static uint16_t Power_Control_Light_Load_Duty_Max(const bms_power_sample_t *samp
                      POWER_LOOP_DUTY_MAX_X100);
 }
 
-static uint16_t Power_Control_Preconnect_Duty_Max(const bms_power_sample_t *sample)
+uint16_t Power_Control_Preconnect_Duty_Max(const bms_power_sample_t *sample)
 {
     uint32_t ideal_boost_duty;
 
@@ -118,7 +120,7 @@ static uint16_t Power_Control_Preconnect_Duty_Max(const bms_power_sample_t *samp
                      POWER_PRECONNECT_BOOST_DUTY_MAX_X100);
 }
 
-static uint16_t Power_Control_Preconnect_Duty_Min(const bms_power_sample_t *sample)
+uint16_t Power_Control_Preconnect_Duty_Min(const bms_power_sample_t *sample)
 {
     uint32_t ideal_boost_duty;
 
@@ -146,7 +148,7 @@ static uint16_t Power_Control_Preconnect_Duty_Min(const bms_power_sample_t *samp
                      POWER_PRECONNECT_BOOST_DUTY_MAX_X100);
 }
 
-static uint8_t Power_Control_Preconnect_Coast_Should_Run(const bms_power_sample_t *sample)
+uint8_t Power_Control_Preconnect_Coast_Should_Run(const bms_power_sample_t *sample)
 {
     if(sample == 0) {
         return 0U;
@@ -169,7 +171,7 @@ static uint8_t Power_Control_Preconnect_Coast_Should_Run(const bms_power_sample_
     return 1U;
 }
 
-static void Power_Control_Preconnect_Coast(void)
+void Power_Control_Preconnect_Coast(void)
 {
     s_power.dutyX100 = POWER_DUTY_MIN_X100;
     s_buck_duty_x100 = POWER_DUTY_MAX_X100;
@@ -180,12 +182,12 @@ static void Power_Control_Preconnect_Coast(void)
     Pi_Controller_Decay(&s_voltage_pi, 1U, 2U);
 }
 
-static uint8_t Power_Control_Afe_Handover_Active(void)
+uint8_t Power_Control_Afe_Handover_Active(void)
 {
     return (s_afe_handover_guard_count != 0U) ? 1U : 0U;
 }
 
-static uint16_t Power_Control_Handover_Boost_Duty(const bms_power_sample_t *sample,
+uint16_t Power_Control_Handover_Boost_Duty(const bms_power_sample_t *sample,
                                                   uint16_t previous_boost_duty_x100)
 {
     uint32_t ideal_boost_duty;
@@ -223,7 +225,7 @@ static uint16_t Power_Control_Handover_Boost_Duty(const bms_power_sample_t *samp
     return Clamp_U16(duty, POWER_DUTY_MIN_X100, BMS_POWER_AFE_HANDOVER_BOOST_DUTY_MAX_X100);
 }
 
-static void Power_Control_Afe_Handover_Start_Output(const bms_power_sample_t *sample,
+void Power_Control_Afe_Handover_Start_Output(const bms_power_sample_t *sample,
                                                     uint16_t previous_boost_duty_x100)
 {
     s_power.dutyX100 = Power_Control_Handover_Boost_Duty(sample, previous_boost_duty_x100);
@@ -233,14 +235,14 @@ static void Power_Control_Afe_Handover_Start_Output(const bms_power_sample_t *sa
     s_async_boost_rectifier = 1U;
 }
 
-static void Power_Control_Afe_Handover_Decay(void)
+void Power_Control_Afe_Handover_Decay(void)
 {
     if(s_afe_handover_guard_count > 0U) {
         s_afe_handover_guard_count--;
     }
 }
 
-static int32_t Power_Control_Limit_Afe_Handover_Duty(const bms_power_sample_t *sample,
+int32_t Power_Control_Limit_Afe_Handover_Duty(const bms_power_sample_t *sample,
                                                      int32_t duty)
 {
     uint16_t duty_floor;
@@ -265,7 +267,7 @@ static int32_t Power_Control_Limit_Afe_Handover_Duty(const bms_power_sample_t *s
     return duty;
 }
 
-static int32_t Power_Control_Limit_Preconnect_Duty(const bms_power_sample_t *sample,
+int32_t Power_Control_Limit_Preconnect_Duty(const bms_power_sample_t *sample,
                                                    int32_t duty)
 {
     uint16_t duty_limit;
@@ -292,7 +294,7 @@ static int32_t Power_Control_Limit_Preconnect_Duty(const bms_power_sample_t *sam
     return duty;
 }
 
-static uint32_t Power_Control_Cc_Duty_Target_Mv(const bms_power_sample_t *sample)
+uint32_t Power_Control_Cc_Duty_Target_Mv(const bms_power_sample_t *sample)
 {
     uint32_t target_mv;
     uint32_t candidate_mv;
@@ -328,7 +330,7 @@ static uint32_t Power_Control_Cc_Duty_Target_Mv(const bms_power_sample_t *sample
     return candidate_mv;
 }
 
-static uint32_t Power_Control_Battery_Boost_Headroom_X100(void)
+uint32_t Power_Control_Battery_Boost_Headroom_X100(void)
 {
     if(s_power.mode == (uint8_t)BMS_CHARGE_MODE_CC &&
        s_async_boost_rectifier != 0U) {
@@ -344,7 +346,7 @@ static uint32_t Power_Control_Battery_Boost_Headroom_X100(void)
     return (uint32_t)BMS_POWER_BATTERY_BOOST_DUTY_HEADROOM_X100;
 }
 
-static uint16_t Power_Control_Battery_Boost_Duty_Max(const bms_power_sample_t *sample)
+uint16_t Power_Control_Battery_Boost_Duty_Max(const bms_power_sample_t *sample)
 {
 #if BMS_POWER_BATTERY_BOOST_DUTY_LIMIT_ENABLE
     uint32_t ideal_boost_duty;
@@ -386,7 +388,7 @@ static uint16_t Power_Control_Battery_Boost_Duty_Max(const bms_power_sample_t *s
 #endif
 }
 
-static int32_t Power_Control_Limit_Battery_Boost_Duty(const bms_power_sample_t *sample,
+int32_t Power_Control_Limit_Battery_Boost_Duty(const bms_power_sample_t *sample,
                                                       int32_t duty)
 {
 #if BMS_POWER_BATTERY_BOOST_DUTY_LIMIT_ENABLE
@@ -405,7 +407,7 @@ static int32_t Power_Control_Limit_Battery_Boost_Duty(const bms_power_sample_t *
     return duty;
 }
 
-static uint8_t Power_Control_Input_Guard_Active(const bms_power_sample_t *sample)
+uint8_t Power_Control_Input_Guard_Active(const bms_power_sample_t *sample)
 {
     if(sample == 0) {
         return 0U;
@@ -427,7 +429,7 @@ static uint8_t Power_Control_Input_Guard_Active(const bms_power_sample_t *sample
     return 0U;
 }
 
-static void Power_Control_Reduce_Duty_For_Input_Guard(const bms_power_sample_t *sample)
+void Power_Control_Reduce_Duty_For_Input_Guard(const bms_power_sample_t *sample)
 {
     uint16_t measured_current_ma;
 
@@ -447,7 +449,7 @@ static void Power_Control_Reduce_Duty_For_Input_Guard(const bms_power_sample_t *
                                              measured_current_ma);
 }
 
-static int32_t Power_Control_Limit_Light_Load_Step(const bms_power_sample_t *sample,
+int32_t Power_Control_Limit_Light_Load_Step(const bms_power_sample_t *sample,
                                                    uint16_t current_ref_ma,
                                                    uint16_t measured_current_ma,
                                                    int32_t step)

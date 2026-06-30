@@ -1,6 +1,6 @@
-/* Internal implementation fragment for charge_manager.c only. */
+#include "charge_manager_internal.h"
 
-static uint16_t Charge_Manager_Calc_Preconnect_Target_Mv(const bms_afe_data_t *afe,
+uint16_t Charge_Manager_Calc_Preconnect_Target_Mv(const bms_afe_data_t *afe,
                                                          const bms_charge_parameters_t *params)
 {
     uint32_t target_mv;
@@ -15,9 +15,9 @@ static uint16_t Charge_Manager_Calc_Preconnect_Target_Mv(const bms_afe_data_t *a
     }
 
     /*
-     * 24V 输入方案下，预连接目标只略高于 Pack，并保持在主 FET 闭合确认
-     * 窗口内。这样 Boost 能把 Vout 推到电池电压附近，同时避免目标本身
-     * 高出 Pack 超过 |Vout-Pack| < 50 mV 的 handover 判据。
+     * 24V 杈撳叆鏂规涓嬶紝棰勮繛鎺ョ洰鏍囧彧鐣ラ珮浜?Pack锛屽苟淇濇寔鍦ㄤ富 FET 闂悎纭
+     * 绐楀彛鍐呫€傝繖鏍?Boost 鑳芥妸 Vout 鎺ㄥ埌鐢垫睜鐢靛帇闄勮繎锛屽悓鏃堕伩鍏嶇洰鏍囨湰韬?
+     * 楂樺嚭 Pack 瓒呰繃 |Vout-Pack| < 50 mV 鐨?handover 鍒ゆ嵁銆?
      */
     target_mv = (uint32_t)afe->packVoltageMv +
                 (uint32_t)BMS_PATH_PRECONNECT_TARGET_ABOVE_PACK_MV;
@@ -28,7 +28,7 @@ static uint16_t Charge_Manager_Calc_Preconnect_Target_Mv(const bms_afe_data_t *a
     return (uint16_t)target_mv;
 }
 
-static uint16_t Charge_Manager_Preconnect_Target_Mv(const bms_afe_data_t *afe,
+uint16_t Charge_Manager_Preconnect_Target_Mv(const bms_afe_data_t *afe,
                                                     const bms_power_sample_t *power_sample,
                                                     const bms_charge_parameters_t *params)
 {
@@ -47,7 +47,7 @@ static uint16_t Charge_Manager_Preconnect_Target_Mv(const bms_afe_data_t *afe,
     return final_target_mv;
 }
 
-static uint16_t Charge_Manager_Preconnect_Current_Limit_Ma(const bms_afe_data_t *afe,
+uint16_t Charge_Manager_Preconnect_Current_Limit_Ma(const bms_afe_data_t *afe,
                                                            const bms_power_sample_t *power_sample,
                                                            uint32_t period_ms)
 {
@@ -57,7 +57,7 @@ static uint16_t Charge_Manager_Preconnect_Current_Limit_Ma(const bms_afe_data_t 
     return BMS_PATH_PRECONNECT_CURRENT_MA;
 }
 
-static uint8_t Charge_Manager_Preconnect_Can_Drive(const bms_afe_data_t *afe,
+uint8_t Charge_Manager_Preconnect_Can_Drive(const bms_afe_data_t *afe,
                                                    const bms_power_sample_t *power_sample)
 {
     if((afe == 0) || (power_sample == 0) || (afe->packVoltageMv == 0U)) {
@@ -73,7 +73,7 @@ static uint8_t Charge_Manager_Preconnect_Can_Drive(const bms_afe_data_t *afe,
     return 1U;
 }
 
-static uint8_t Charge_Manager_Cv_Entry_Ready(const bms_afe_data_t *afe,
+uint8_t Charge_Manager_Cv_Entry_Ready(const bms_afe_data_t *afe,
                                              const bms_power_sample_t *power_sample,
                                              const bms_charge_parameters_t *params)
 {
@@ -95,40 +95,40 @@ static uint8_t Charge_Manager_Cv_Entry_Ready(const bms_afe_data_t *afe,
     return 0U;
 }
 
-static void Charge_Manager_Clear_Manual_Fet(void)
+void Charge_Manager_Clear_Manual_Fet(void)
 {
     s_manual_fet_active = 0U;
     s_manual_fet_mask = 0U;
 }
 
-static void Charge_Manager_Clear_Path_Settle_State_Unlocked(void)
+void Charge_Manager_Clear_Path_Settle_State_Unlocked(void)
 {
     s_path_settle_remaining_ms = 0U;
     s_last_battery_path_enabled = 0U;
     s_path_settle_target_mv = 0U;
 }
 
-static void Charge_Manager_Clear_Path_Settle_Unlocked(void)
+void Charge_Manager_Clear_Path_Settle_Unlocked(void)
 {
     Charge_Manager_Clear_Path_Settle_State_Unlocked();
     s_preconnect_target_mv = 0U;
 }
 
-static void Charge_Manager_Clear_Path_Settle(void)
+void Charge_Manager_Clear_Path_Settle(void)
 {
     taskENTER_CRITICAL();
     Charge_Manager_Clear_Path_Settle_Unlocked();
     taskEXIT_CRITICAL();
 }
 
-static void Charge_Manager_Clear_Path_Settle_Only(void)
+void Charge_Manager_Clear_Path_Settle_Only(void)
 {
     taskENTER_CRITICAL();
     Charge_Manager_Clear_Path_Settle_State_Unlocked();
     taskEXIT_CRITICAL();
 }
 
-static uint8_t Charge_Manager_Path_Settle_Active(void)
+uint8_t Charge_Manager_Path_Settle_Active(void)
 {
     uint8_t active;
 
@@ -139,7 +139,7 @@ static uint8_t Charge_Manager_Path_Settle_Active(void)
     return active;
 }
 
-static uint8_t Charge_Manager_Battery_Path_Rising_Edge(void)
+uint8_t Charge_Manager_Battery_Path_Rising_Edge(void)
 {
     uint8_t rising_edge;
 
@@ -150,7 +150,7 @@ static uint8_t Charge_Manager_Battery_Path_Rising_Edge(void)
     return rising_edge;
 }
 
-static void Charge_Manager_Update_Path_Settle(uint8_t battery_path_enabled,
+void Charge_Manager_Update_Path_Settle(uint8_t battery_path_enabled,
                                               const bms_afe_data_t *afe,
                                               const bms_charge_parameters_t *params)
 {
@@ -172,7 +172,7 @@ static void Charge_Manager_Update_Path_Settle(uint8_t battery_path_enabled,
     taskEXIT_CRITICAL();
 }
 
-static void Charge_Manager_Decay_Path_Settle(uint32_t period_ms)
+void Charge_Manager_Decay_Path_Settle(uint32_t period_ms)
 {
     if(period_ms == 0U) {
         period_ms = 1U;

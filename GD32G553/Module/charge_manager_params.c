@@ -1,6 +1,6 @@
-/* Internal implementation fragment for charge_manager.c only. */
+#include "charge_manager_internal.h"
 
-static bms_command_reply_t Reply_Ok(void)
+bms_command_reply_t Reply_Ok(void)
 {
     bms_command_reply_t reply;
 
@@ -9,7 +9,7 @@ static bms_command_reply_t Reply_Ok(void)
     return reply;
 }
 
-static bms_command_reply_t Reply_Error(uint8_t error_code)
+bms_command_reply_t Reply_Error(uint8_t error_code)
 {
     bms_command_reply_t reply;
 
@@ -18,9 +18,9 @@ static bms_command_reply_t Reply_Error(uint8_t error_code)
     return reply;
 }
 
-static void Charge_Manager_Default_Parameters(bms_charge_parameters_t *parameters)
+void Charge_Manager_Default_Parameters(bms_charge_parameters_t *parameters)
 {
-    /* 默认参数对应 bms_types.h 中的 9 串锂电池方案。 */
+    /* 榛樿鍙傛暟瀵瑰簲 bms_types.h 涓殑 9 涓查攤鐢垫睜鏂规銆?*/
     parameters->targetVoltageMv = BMS_DEFAULT_TARGET_VOLTAGE_MV;
     parameters->targetCurrentMa = BMS_DEFAULT_TARGET_CURRENT_MA;
     parameters->cutoffCurrentMa = BMS_DEFAULT_CUTOFF_CURRENT_MA;
@@ -30,7 +30,7 @@ static void Charge_Manager_Default_Parameters(bms_charge_parameters_t *parameter
     parameters->balanceDeltaMv = BMS_DEFAULT_BALANCE_DELTA_MV;
 }
 
-static void Charge_Manager_Clamp_Parameters(bms_charge_parameters_t *parameters)
+void Charge_Manager_Clamp_Parameters(bms_charge_parameters_t *parameters)
 {
     if(parameters == 0) {
         return;
@@ -54,7 +54,7 @@ static void Charge_Manager_Clamp_Parameters(bms_charge_parameters_t *parameters)
     }
 }
 
-static uint8_t Charge_Manager_Validate_Parameters(const bms_charge_parameters_t *parameters)
+uint8_t Charge_Manager_Validate_Parameters(const bms_charge_parameters_t *parameters)
 {
     uint32_t pack_limit_mv;
 
@@ -65,8 +65,8 @@ static uint8_t Charge_Manager_Validate_Parameters(const bms_charge_parameters_t 
     pack_limit_mv = (uint32_t)parameters->cellOvpMv * BMS_CELL_COUNT;
 
     /*
-     * 即使上位机已经做了校验，固件仍然要再次限制参数范围。
-     * 固件是防止危险命令或损坏帧进入功率级的最后一道保护。
+     * 鍗充娇涓婁綅鏈哄凡缁忓仛浜嗘牎楠岋紝鍥轰欢浠嶇劧瑕佸啀娆￠檺鍒跺弬鏁拌寖鍥淬€?
+     * 鍥轰欢鏄槻姝㈠嵄闄╁懡浠ゆ垨鎹熷潖甯ц繘鍏ュ姛鐜囩骇鐨勬渶鍚庝竴閬撲繚鎶ゃ€?
      */
     if(parameters->targetVoltageMv < 25000U ||
        parameters->targetVoltageMv > BMS_BATTERY_FULL_CHARGE_VOLTAGE_MV ||
@@ -97,7 +97,7 @@ static uint8_t Charge_Manager_Validate_Parameters(const bms_charge_parameters_t 
     return 1U;
 }
 
-static uint8_t Charge_Manager_Validate_Digital_Power(uint16_t target_voltage_mv,
+uint8_t Charge_Manager_Validate_Digital_Power(uint16_t target_voltage_mv,
                                                      uint16_t current_limit_ma)
 {
     if(target_voltage_mv < BMS_DIGITAL_POWER_MIN_OUTPUT_MV ||

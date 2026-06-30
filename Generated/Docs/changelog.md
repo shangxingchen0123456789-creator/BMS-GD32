@@ -2,6 +2,13 @@
 
 ## 2026-06-30
 
+- Converted all remaining project-owned `.inc` files into real `.c` modules.
+- Added `power_control_internal.h` and `charge_manager_internal.h` to hold
+  private contexts and internal helper contracts for the former fragments.
+- Updated Keil to compile `power_control_api/limits/mode/safety.c` and
+  `charge_manager_params/path/faults/control/commands.c` as independent units.
+- Updated structure tests to reject any remaining `.inc` files or Keil `.inc`
+  references.
 - Promoted the former `Driver/power_control_pwm.inc` fragment into the real
   `Driver/power_pwm.c/.h` module.
 - Added `power_pwm.c` to the Keil Driver group as an independent compilation

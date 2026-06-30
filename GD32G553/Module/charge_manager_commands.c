@@ -1,6 +1,6 @@
-/* Internal implementation fragment for charge_manager.c only. */
+#include "charge_manager_internal.h"
 
-static bms_command_reply_t Charge_Manager_Handle_Fet_Mask_Command(uint8_t fet_mask)
+bms_command_reply_t Charge_Manager_Handle_Fet_Mask_Command(uint8_t fet_mask)
 {
     uint8_t fet_status;
     uint32_t blocking_faults;
@@ -343,8 +343,8 @@ bms_command_reply_t Charge_Manager_Handle_Command(uint8_t command_id, uint8_t ar
             run_request_active = s_run_request;
             if(s_run_request != 0U) {
                 /*
-                 * 运行中切换模式时，下一轮控制周期必须重新按新模式选择
-                 * 涓流/恒流/恒压阶段，否则目标电流可能还沿用旧阶段。
+                 * 杩愯涓垏鎹㈡ā寮忔椂锛屼笅涓€杞帶鍒跺懆鏈熷繀椤婚噸鏂版寜鏂版ā寮忛€夋嫨
+                 * 娑撴祦/鎭掓祦/鎭掑帇闃舵锛屽惁鍒欑洰鏍囩數娴佸彲鑳借繕娌跨敤鏃ч樁娈点€?
                 */
                 s_state = BMS_CHARGE_STATE_PRECHECK;
                 s_cv_done_counter = 0U;
@@ -425,9 +425,9 @@ bms_command_reply_t Charge_Manager_Handle_Digital_Power_Command(uint8_t enable,
     }
     if(s_digital_power_enabled != 0U) {
         /*
-         * 已在数字电源运行中，直接更新目标电压/电流。
-         * 电压环会平滑跟踪到新设定值，不再停机泄放再重启。
-         * 调低电压时由 OVP 软限幅兜底，而不是先掉电。
+         * 宸插湪鏁板瓧鐢垫簮杩愯涓紝鐩存帴鏇存柊鐩爣鐢靛帇/鐢垫祦銆?
+         * 鐢靛帇鐜細骞虫粦璺熻釜鍒版柊璁惧畾鍊硷紝涓嶅啀鍋滄満娉勬斁鍐嶉噸鍚€?
+         * 璋冧綆鐢靛帇鏃剁敱 OVP 杞檺骞呭厹搴曪紝鑰屼笉鏄厛鎺夌數銆?
          */
         s_digital_power_target_voltage_mv = target_voltage_mv;
         s_digital_power_current_limit_ma = current_limit_ma;

@@ -1,6 +1,6 @@
-/* Internal implementation fragment for charge_manager.c only. */
+#include "charge_manager_internal.h"
 
-static uint32_t Charge_Manager_Filter_Digital_Power_Afeless_Faults(uint32_t faults)
+uint32_t Charge_Manager_Filter_Digital_Power_Afeless_Faults(uint32_t faults)
 {
 #if BMS_DIGITAL_POWER_AFELESS_DEBUG
     return faults & ~DIGITAL_POWER_AFELESS_FAULT_MASK;
@@ -9,7 +9,7 @@ static uint32_t Charge_Manager_Filter_Digital_Power_Afeless_Faults(uint32_t faul
 #endif
 }
 
-static uint8_t Charge_Manager_Afeless_Filter_Active(uint8_t digital_power_enabled,
+uint8_t Charge_Manager_Afeless_Filter_Active(uint8_t digital_power_enabled,
                                                     uint8_t power_requested)
 {
 #if BMS_DIGITAL_POWER_AFELESS_DEBUG
@@ -24,7 +24,7 @@ static uint8_t Charge_Manager_Afeless_Filter_Active(uint8_t digital_power_enable
     return 0U;
 }
 
-static uint8_t Charge_Manager_Afe_Sample_Valid(const bms_afe_data_t *afe)
+uint8_t Charge_Manager_Afe_Sample_Valid(const bms_afe_data_t *afe)
 {
     uint32_t i;
 
@@ -47,7 +47,7 @@ static uint8_t Charge_Manager_Afe_Sample_Valid(const bms_afe_data_t *afe)
     return 1U;
 }
 
-static uint8_t Charge_Manager_Temperature_Valid(int16_t temperature_x10)
+uint8_t Charge_Manager_Temperature_Valid(int16_t temperature_x10)
 {
     if(temperature_x10 == (int16_t)BMS_TEMP_UNAVAILABLE_X10) {
         return 0U;
@@ -60,7 +60,7 @@ static uint8_t Charge_Manager_Temperature_Valid(int16_t temperature_x10)
     return 1U;
 }
 
-static uint8_t Charge_Manager_Power_Ocp_Check_Active(uint8_t power_requested,
+uint8_t Charge_Manager_Power_Ocp_Check_Active(uint8_t power_requested,
                                                      const power_control_state_t *power_state)
 {
     if(power_requested == 0U || power_state == 0) {
@@ -81,19 +81,19 @@ static uint8_t Charge_Manager_Power_Ocp_Check_Active(uint8_t power_requested,
     return 1U;
 }
 
-static void Charge_Manager_Reset_Output_Ovp_Counters(void)
+void Charge_Manager_Reset_Output_Ovp_Counters(void)
 {
     s_output_ovp_confirm_count = 0U;
     s_digital_output_ovp_confirm_count = 0U;
 }
 
-static void Charge_Manager_Reset_Charge_Ocp_Counter(void)
+void Charge_Manager_Reset_Charge_Ocp_Counter(void)
 {
     s_charge_ocp_confirm_count = 0U;
 }
 
 
-static uint8_t Charge_Manager_Output_Ovp_Confirmed(uint16_t output_voltage_mv,
+uint8_t Charge_Manager_Output_Ovp_Confirmed(uint16_t output_voltage_mv,
                                                    uint16_t target_voltage_mv,
                                                    uint8_t run_request,
                                                    uint8_t digital_power)
@@ -136,7 +136,7 @@ static uint8_t Charge_Manager_Output_Ovp_Confirmed(uint16_t output_voltage_mv,
     return (*counter >= BMS_OUTPUT_OVP_CONFIRM_CONTROL_COUNT) ? 1U : 0U;
 }
 
-static void Charge_Manager_Record_Faults(uint32_t realtime_faults,
+void Charge_Manager_Record_Faults(uint32_t realtime_faults,
                                         uint32_t latchable_faults)
 {
     if(latchable_faults != 0U) {
@@ -151,7 +151,7 @@ static void Charge_Manager_Record_Faults(uint32_t realtime_faults,
     taskEXIT_CRITICAL();
 }
 
-static uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
+uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
                                               const bms_power_sample_t *power_sample,
                                               uint8_t power_requested)
 {
@@ -172,8 +172,8 @@ static uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
     power_path_manager_state_t path_state;
 
     /*
-     * 锁存故障会一直保留到收到 CMD_CLEAR_FAULT。实时故障本轮重新采集，
-     * 一旦出现就同步交给 safety_manager 立即关断 Q4/Q5。
+     * 閿佸瓨鏁呴殰浼氫竴鐩翠繚鐣欏埌鏀跺埌 CMD_CLEAR_FAULT銆傚疄鏃舵晠闅滄湰杞噸鏂伴噰闆嗭紝
+     * 涓€鏃﹀嚭鐜板氨鍚屾浜ょ粰 safety_manager 绔嬪嵆鍏虫柇 Q4/Q5銆?
      */
     taskENTER_CRITICAL();
     faults = s_latched_faults;
@@ -255,8 +255,8 @@ static uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
     } else {
 #if BMS_ENABLE_INPUT_UV_FAULT
         /*
-         * 仅在需要外部输入供电的充电工况下，才把输入欠压当作故障。
-         * 数字电源模式和板级调试阶段默认关闭此项。
+         * 浠呭湪闇€瑕佸閮ㄨ緭鍏ヤ緵鐢电殑鍏呯數宸ュ喌涓嬶紝鎵嶆妸杈撳叆娆犲帇褰撲綔鏁呴殰銆?
+         * 鏁板瓧鐢垫簮妯″紡鍜屾澘绾ц皟璇曢樁娈甸粯璁ゅ叧闂椤广€?
          */
         if((power_requested != 0U) && (power_sample->inputVoltageMv < BMS_DEFAULT_INPUT_UV_THRESHOLD_MV)) {
             realtime_faults |= BMS_FAULT_INPUT_UV;
@@ -275,7 +275,7 @@ static uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
                                                       0U,
                                                       0U);
         }
-        /* 硬件 FAULT_OC 和软件电流裕量超限都映射为充电过流故障。 */
+        /* 纭欢 FAULT_OC 鍜岃蒋浠剁數娴佽閲忚秴闄愰兘鏄犲皠涓哄厖鐢佃繃娴佹晠闅溿€?*/
         if((power_ocp_check_active != 0U) &&
            (power_sample->faultOcActive != 0U ||
             power_sample->outputCurrentMa > (int16_t)(current_limit_ma + 1500U))) {
@@ -358,7 +358,7 @@ static uint32_t Charge_Manager_Collect_Faults(const bms_afe_data_t *afe,
     return faults;
 }
 
-static uint32_t Charge_Manager_Collect_Digital_Power_Faults(const bms_power_sample_t *power_sample,
+uint32_t Charge_Manager_Collect_Digital_Power_Faults(const bms_power_sample_t *power_sample,
                                                             uint16_t target_voltage_mv,
                                                             uint16_t current_limit_ma)
 {

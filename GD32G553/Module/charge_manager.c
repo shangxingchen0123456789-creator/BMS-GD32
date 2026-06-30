@@ -1,82 +1,6 @@
-#include "charge_manager.h"
+#include "charge_manager_internal.h"
 
-#include "bms_board_config.h"
-#include "FreeRTOS.h"
-#include "task.h"
-#include "afe_gd30bm2016.h"
-#include "param_storage.h"
-#include "power_control.h"
-#include "power_manager.h"
-#include "power_path_manager.h"
-#include "safety_manager.h"
-
-#include <string.h>
-
-/*
- * 充电监督状态机。
- *
- * 本模块统一管理上位机命令、充电参数、锁存故障和高层充电状态。
- * 它不直接操作 PWM 寄存器，而是向 power_control.c 下发电压/电流目标。
- */
-#define CMD_START_CHARGE                       0x01U
-#define CMD_STOP_CHARGE                        0x02U
-#define CMD_EMERGENCY_STOP                     0x03U
-#define CMD_CLEAR_FAULT                        0x04U
-#define CMD_SWITCH_MODE                        0x05U
-#define CMD_DIGITAL_POWER_SET                  BMS_CMD_DIGITAL_POWER_SET
-#define CMD_SET_WORK_MODE                      BMS_CMD_SET_WORK_MODE
-#define CMD_SET_FET_MASK                       BMS_CMD_SET_FET_MASK
-
-#define PACK_OVP_MARGIN_MV                     BMS_DEFAULT_OUTPUT_OVP_MARGIN_MV
-#define TRICKLE_ENTER_CELL_MV                  3100U
-#define TRICKLE_EXIT_CELL_MV                   3200U
-#define CV_ENTRY_MARGIN_MV                     200U
-#define CV_DONE_CONFIRM_COUNT                  100U
-#define CV_DONE_DPM_MARGIN_MA                  20U
-#define TRICKLE_CURRENT_MA                     BMS_DEFAULT_TRICKLE_CURRENT_MA
-#define MANUAL_FET_TAKEOVER_DELAY_MS           25U
-#define CHARGE_PATH_SETTLE_MS                  300U
-#define DIGITAL_POWER_AFELESS_FAULT_MASK       (BMS_FAULT_CELL_OVP | \
-                                                BMS_FAULT_CELL_UVP | \
-                                                BMS_FAULT_AFE_COMM | \
-                                                BMS_FAULT_INPUT_UV | \
-                                                BMS_FAULT_BATTERY_DISCONNECT | \
-                                                BMS_FAULT_SHORT_CIRCUIT | \
-                                                BMS_FAULT_FUSE | \
-                                                BMS_FAULT_AFE_PROTECTION)
-#define DIGITAL_POWER_STARTUP_IGNORE_MASK      (DIGITAL_POWER_AFELESS_FAULT_MASK | \
-                                                BMS_FAULT_PACK_OVP)
-#define AFE_RECOVERABLE_LATCH_FAULT_MASK       (BMS_FAULT_CHARGE_OCP | \
-                                                BMS_FAULT_SHORT_CIRCUIT | \
-                                                BMS_FAULT_AFE_PROTECTION)
-
-static bms_charge_parameters_t s_params;
-static bms_charge_state_t s_state;
-static uint8_t s_run_request;
-static uint8_t s_mode;
-static uint8_t s_work_mode;
-static uint32_t s_latched_faults;
-static uint32_t s_present_faults;
-static uint16_t s_cv_done_counter;
-static uint8_t s_digital_power_enabled;
-static uint16_t s_digital_power_target_voltage_mv;
-static uint16_t s_digital_power_current_limit_ma;
-static uint8_t s_output_ovp_confirm_count;
-static uint8_t s_digital_output_ovp_confirm_count;
-static uint8_t s_charge_ocp_confirm_count;
-static uint8_t s_manual_fet_active;
-static uint8_t s_manual_fet_mask;
-static uint16_t s_path_settle_remaining_ms;
-static uint8_t s_last_battery_path_enabled;
-static uint16_t s_path_settle_target_mv;
-static uint16_t s_preconnect_target_mv;
-
-
-#include "charge_manager_params.inc"
-#include "charge_manager_path.inc"
-#include "charge_manager_faults.inc"
-#include "charge_manager_control.inc"
-#include "charge_manager_commands.inc"
+charge_manager_context_t g_charge_manager;
 
 void Charge_Manager_Update(uint32_t period_ms,
                            const bms_afe_data_t *afe,
@@ -142,9 +66,9 @@ void Charge_Manager_Update(uint32_t period_ms,
     }
 
     /*
-     * 这里的优先级不能随意调整：
-     * 先处理故障并立即关 PWM；再处理停止/空闲；最后才允许自动充电曲线
-     * 在涓流、恒流、恒压和完成状态之间切换。
+     * 杩欓噷鐨勪紭鍏堢骇涓嶈兘闅忔剰璋冩暣锛?
+     * 鍏堝鐞嗘晠闅滃苟绔嬪嵆鍏?PWM锛涘啀澶勭悊鍋滄/绌洪棽锛涙渶鍚庢墠鍏佽鑷姩鍏呯數鏇茬嚎
+     * 鍦ㄦ稉娴併€佹亽娴併€佹亽鍘嬪拰瀹屾垚鐘舵€佷箣闂村垏鎹€?
      */
     if(faults != 0U) {
         run_request = 0U;
@@ -202,7 +126,7 @@ void Charge_Manager_Update(uint32_t period_ms,
         }
 
         if(mode == (uint8_t)BMS_CHARGE_MODE_AUTO) {
-            /* 自动曲线：低压单体先涓流，正常后恒流，接近目标电压后进入恒压。 */
+            /* 鑷姩鏇茬嚎锛氫綆鍘嬪崟浣撳厛娑撴祦锛屾甯稿悗鎭掓祦锛屾帴杩戠洰鏍囩數鍘嬪悗杩涘叆鎭掑帇銆?*/
             if(state == BMS_CHARGE_STATE_TRICKLE && afe->cellMinMv >= TRICKLE_EXIT_CELL_MV) {
                 state = BMS_CHARGE_STATE_CC;
             }
@@ -217,7 +141,7 @@ void Charge_Manager_Update(uint32_t period_ms,
                (Charge_Manager_Cv_Done_Allowed(power_sample, &params) != 0U) &&
                (battery_current_ma >= 0) &&
                (battery_current_ma <= (int16_t)params.cutoffCurrentMa)) {
-                /* 需要连续多次低电流采样，才判定充电完成，避免偶发抖动误触发。 */
+                /* 闇€瑕佽繛缁娆′綆鐢垫祦閲囨牱锛屾墠鍒ゅ畾鍏呯數瀹屾垚锛岄伩鍏嶅伓鍙戞姈鍔ㄨ瑙﹀彂銆?*/
                 s_cv_done_counter++;
                 if(s_cv_done_counter > CV_DONE_CONFIRM_COUNT) {
                     state = BMS_CHARGE_STATE_DONE;
@@ -257,9 +181,9 @@ void Charge_Manager_Update(uint32_t period_ms,
             } else {
                 Charge_Manager_Update_Path_Settle(0U, afe, &params);
                 /*
-                 * 24V 输入下全程主动 Boost 预连接：先把 Vout 推到 Pack 附近，
-                 * 再闭合 BM2016 主 CHG+DSG。预连接目标保持在闭合确认窗口内，
-                 * 避免目标电压本身把 |Vout-Pack| 拉出 50 mV 阈值。
+                 * 24V 杈撳叆涓嬪叏绋嬩富鍔?Boost 棰勮繛鎺ワ細鍏堟妸 Vout 鎺ㄥ埌 Pack 闄勮繎锛?
+                 * 鍐嶉棴鍚?BM2016 涓?CHG+DSG銆傞杩炴帴鐩爣淇濇寔鍦ㄩ棴鍚堢‘璁ょ獥鍙ｅ唴锛?
+                 * 閬垮厤鐩爣鐢靛帇鏈韩鎶?|Vout-Pack| 鎷夊嚭 50 mV 闃堝€笺€?
                  */
                 Safety_Manager_Set_Afe_Alert_Monitor(0U);
                 state = BMS_CHARGE_STATE_PRECHECK;
@@ -307,7 +231,7 @@ void Charge_Manager_Update(uint32_t period_ms,
     }
 
     memset(status, 0, sizeof(*status));
-    /* status 是 SOC、均衡和 UART 上报共同使用的统一状态结构。 */
+    /* status 鏄?SOC銆佸潎琛″拰 UART 涓婃姤鍏卞悓浣跨敤鐨勭粺涓€鐘舵€佺粨鏋勩€?*/
     status->packVoltageMv = afe->packVoltageMv;
     status->inputVoltageMv = power_sample->inputVoltageMv;
     status->outputVoltageMv = power_sample->outputVoltageMv;
