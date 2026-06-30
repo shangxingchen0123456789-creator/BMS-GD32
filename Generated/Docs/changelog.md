@@ -2,6 +2,12 @@
 
 ## 2026-06-30
 
+- Refactored `Charge_Manager_Update` into local helper functions for context
+  snapshot/load-store, mode dispatch, normal charge flow, path ownership, and
+  status filling.
+- Added generated tests to keep `Charge_Manager_Update` as a short
+  orchestration function.
+
 - Split `power_control_context_t` into `loop`, `fault`, `transition`, and
   `feedback` private sub-contexts.
 - Split `charge_manager_context_t` into `config`, `control`, `digital`,

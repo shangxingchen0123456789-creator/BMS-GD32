@@ -78,6 +78,7 @@ GENERATED_EXPECTED_FILES = [
     "README.md",
     "Docs/architecture.md",
     "Docs/changelog.md",
+    "Docs/charge_manager_update_helpers_design.md",
     "Docs/charge_manager_split_design.md",
     "Docs/coding_standard.md",
     "Docs/internal_context_access_design.md",
@@ -94,6 +95,7 @@ GENERATED_EXPECTED_FILES = [
     "BuildLogs/uv4_remove_inc_modules_rebuild_20260630.log",
     "BuildLogs/uv4_internal_context_access_rebuild_20260630.log",
     "BuildLogs/uv4_internal_context_split_rebuild_20260630.log",
+    "BuildLogs/uv4_charge_update_helpers_rebuild_20260630.log",
 ]
 
 OLD_GENERATED_PATHS = [
@@ -302,6 +304,31 @@ def assert_power_pwm_module() -> None:
         fail("Keil project does not list power_pwm.h")
 
 
+def assert_charge_update_uses_helpers() -> None:
+    source = (FW / "Module" / "charge_manager.c").read_text(encoding="utf-8")
+    required_helpers = [
+        "Charge_Manager_Load_Update_Context",
+        "Charge_Manager_Collect_Update_Faults",
+        "Charge_Manager_Dispatch_Update_State",
+        "Charge_Manager_Handle_Normal_Charge",
+        "Charge_Manager_Apply_Final_Path_State",
+        "Charge_Manager_Fill_Status",
+        "Charge_Manager_Store_Update_Context",
+    ]
+
+    for helper in required_helpers:
+        if source.count(helper) < 2:
+            fail(f"Charge_Manager_Update helper is not defined and used: {helper}")
+
+    marker = "void Charge_Manager_Update(uint32_t period_ms,"
+    update_start = source.find(marker)
+    if update_start < 0:
+        fail("Charge_Manager_Update implementation not found")
+    update_body_lines = source[update_start:].splitlines()
+    if len(update_body_lines) > 40:
+        fail("Charge_Manager_Update orchestration body grew too long")
+
+
 def assert_generated_files_grouped() -> None:
     for rel in GENERATED_EXPECTED_FILES:
         path = GENERATED / rel
@@ -369,6 +396,7 @@ def main() -> int:
         ("internal context access is explicit", assert_internal_context_access_explicit),
         ("internal contexts are grouped", assert_internal_contexts_are_grouped),
         ("power pwm module extracted", assert_power_pwm_module),
+        ("charge update uses helpers", assert_charge_update_uses_helpers),
         ("generated files grouped", assert_generated_files_grouped),
     ]
 

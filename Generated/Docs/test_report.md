@@ -205,3 +205,40 @@ Program Size: Code=76340 RO-data=1896 RW-data=8 ZI-data=24592
 "..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
 Build Time Elapsed:  00:00:07
 ```
+
+## Charge Manager Update Helpers Follow-up
+
+This round keeps `Charge_Manager_Update` as the public update entry point but
+splits its internal work into private helpers for snapshotting, dispatch,
+normal charging, path ownership, status output, and context write-back.
+
+`python Generated\Tests\run_tests.py` passed for this follow-up on 2026-06-30:
+
+```text
+PASS layer files exist
+PASS old moved paths removed
+PASS Keil FilePath entries resolve
+PASS Keil include paths use layers
+PASS no inc files remain
+PASS real internal modules referenced
+PASS internal context access is explicit
+PASS internal contexts are grouped
+PASS power pwm module extracted
+PASS charge update uses helpers
+PASS generated files grouped
+SKIP optional C unit tests: no gcc, clang, or cl found on PATH
+```
+
+Keil UV4 command-line rebuild passed for this follow-up on 2026-06-30:
+
+```text
+compiling charge_manager_path.c...
+compiling charge_manager.c...
+compiling power_manager.c...
+compiling charge_manager_faults.c...
+compiling charge_manager_control.c...
+compiling charge_manager_commands.c...
+Program Size: Code=76724 RO-data=1896 RW-data=8 ZI-data=24592
+"..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:06
+```
