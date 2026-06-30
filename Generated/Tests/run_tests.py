@@ -7,7 +7,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
+GENERATED = ROOT / "Generated"
+TEST_ROOT = GENERATED / "Tests"
 FW = ROOT / "GD32G553"
 PROJECT_FILE = FW / "Project" / "GD32G553_CHG.uvprojx"
 
@@ -52,6 +54,24 @@ CHARGE_MANAGER_FRAGMENTS = [
     'charge_manager_faults.inc',
     'charge_manager_control.inc',
     'charge_manager_commands.inc',
+]
+
+GENERATED_EXPECTED_FILES = [
+    "README.md",
+    "Docs/architecture.md",
+    "Docs/changelog.md",
+    "Docs/charge_manager_split_design.md",
+    "Docs/coding_standard.md",
+    "Docs/test_report.md",
+    "Tests/run_tests.py",
+    "Tests/unit/test_common_logic.c",
+    "BuildLogs/codex_build_async_fix.log",
+]
+
+OLD_GENERATED_PATHS = [
+    "Docs",
+    "Tests",
+    "GD32G553_Code_Overview.md",
 ]
 
 MOVED_OLD_PATHS = [
@@ -159,6 +179,18 @@ def assert_charge_manager_fragments() -> None:
         last_index = index
 
 
+def assert_generated_files_grouped() -> None:
+    for rel in GENERATED_EXPECTED_FILES:
+        path = GENERATED / rel
+        if not path.exists():
+            fail(f"missing generated file: {path}")
+
+    for rel in OLD_GENERATED_PATHS:
+        path = ROOT / rel
+        if path.exists():
+            fail(f"generated file or folder still at repository root: {path}")
+
+
 def find_c_compiler() -> str | None:
     for compiler in ("gcc", "clang", "cl"):
         found = shutil.which(compiler)
@@ -173,11 +205,11 @@ def run_optional_c_unit_tests() -> None:
         print("SKIP optional C unit tests: no gcc, clang, or cl found on PATH")
         return
 
-    build_dir = ROOT / "Tests" / "build"
+    build_dir = TEST_ROOT / "build"
     build_dir.mkdir(exist_ok=True)
     exe = build_dir / ("test_common_logic.exe" if os.name == "nt" else "test_common_logic")
     sources = [
-        ROOT / "Tests" / "unit" / "test_common_logic.c",
+        TEST_ROOT / "unit" / "test_common_logic.c",
         FW / "Common" / "pi_controller.c",
         FW / "Common" / "battery_model.c",
         FW / "Module" / "balance_manager.c",
@@ -210,6 +242,7 @@ def main() -> int:
         ("Keil FilePath entries resolve", assert_keil_paths_resolve),
         ("Keil include paths use layers", assert_keil_uses_layers),
         ("charge manager fragments included", assert_charge_manager_fragments),
+        ("generated files grouped", assert_generated_files_grouped),
     ]
 
     for name, check in checks:

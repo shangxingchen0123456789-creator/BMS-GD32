@@ -24,8 +24,8 @@
 | Driver | `GD32G553/Driver` | AFE、ADC、PWM、Flash 等硬件访问 |
 | Module | `GD32G553/Module` | 充电状态机、SOC、均衡、电源路径策略 |
 | Service | `GD32G553/Service` | 通信、状态快照、故障日志、参数存储、安全服务 |
-| Tests | `Tests` | 主机侧检查和单元测试 |
-| Docs | `Docs` | 架构、设计、变更和测试记录 |
+| Tests | `Generated/Tests` | 主机侧检查和单元测试 |
+| Docs | `Generated/Docs` | 架构、设计、变更和测试记录 |
 
 ## 当前边界
 

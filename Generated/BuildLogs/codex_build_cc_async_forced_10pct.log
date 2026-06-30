@@ -1,0 +1,7 @@
+*** Using Compiler 'V6.19', folder: 'D:\Keil_v5\ARM\ARMCLANG\Bin'
+Build target 'Target 1'
+compiling power_control.c...
+linking...
+Program Size: Code=76820 RO-data=1896 RW-data=8 ZI-data=24600
+"..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:02

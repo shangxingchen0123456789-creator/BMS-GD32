@@ -44,7 +44,7 @@
 运行：
 
 ```powershell
-python Tests/run_tests.py
+python Generated\Tests\run_tests.py
 ```
 
 测试入口会检查：

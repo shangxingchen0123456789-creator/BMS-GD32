@@ -40,7 +40,7 @@
 运行：
 
 ```powershell
-python Tests/run_tests.py
+python Generated\Tests\run_tests.py
 ```
 
 测试会检查内部分片文件存在、`charge_manager.c` 包含这些分片、Keil 工程路径仍然有效。若本机有 C 编译器，还会运行已有 Common/Module 主机侧单元测试。

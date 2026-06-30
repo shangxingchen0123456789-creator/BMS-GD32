@@ -9,7 +9,7 @@ GD32G553/Project/*.uvguix.*
 
 # Codex and local build logs
 GD32G553/Project/codex_build_*.log
-Tests/build/
+Generated/Tests/build/
 
 # Generic editor and OS noise
 *.swp
