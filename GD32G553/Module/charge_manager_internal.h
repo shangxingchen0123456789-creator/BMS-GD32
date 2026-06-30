@@ -49,25 +49,49 @@
 
 typedef struct {
     bms_charge_parameters_t params;
+} charge_manager_config_context_t;
+
+typedef struct {
     bms_charge_state_t state;
     uint8_t runRequest;
     uint8_t mode;
     uint8_t workMode;
+    uint16_t cvDoneCounter;
+} charge_manager_control_context_t;
+
+typedef struct {
+    uint8_t enabled;
+    uint16_t targetVoltageMv;
+    uint16_t currentLimitMa;
+} charge_manager_digital_context_t;
+
+typedef struct {
     uint32_t latchedFaults;
     uint32_t presentFaults;
-    uint16_t cvDoneCounter;
-    uint8_t digitalPowerEnabled;
-    uint16_t digitalPowerTargetVoltageMv;
-    uint16_t digitalPowerCurrentLimitMa;
     uint8_t outputOvpConfirmCount;
     uint8_t digitalOutputOvpConfirmCount;
     uint8_t chargeOcpConfirmCount;
-    uint8_t manualFetActive;
-    uint8_t manualFetMask;
-    uint16_t pathSettleRemainingMs;
+} charge_manager_fault_context_t;
+
+typedef struct {
+    uint8_t active;
+    uint8_t mask;
+} charge_manager_manual_fet_context_t;
+
+typedef struct {
+    uint16_t settleRemainingMs;
     uint8_t lastBatteryPathEnabled;
-    uint16_t pathSettleTargetMv;
+    uint16_t settleTargetMv;
     uint16_t preconnectTargetMv;
+} charge_manager_path_context_t;
+
+typedef struct {
+    charge_manager_config_context_t config;
+    charge_manager_control_context_t control;
+    charge_manager_digital_context_t digital;
+    charge_manager_fault_context_t fault;
+    charge_manager_manual_fet_context_t manualFet;
+    charge_manager_path_context_t path;
 } charge_manager_context_t;
 
 extern charge_manager_context_t g_charge_manager;

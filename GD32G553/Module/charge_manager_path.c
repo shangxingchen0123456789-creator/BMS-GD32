@@ -41,7 +41,7 @@ uint16_t Charge_Manager_Preconnect_Target_Mv(const bms_afe_data_t *afe,
     }
 
     taskENTER_CRITICAL();
-    g_charge_manager.preconnectTargetMv = final_target_mv;
+    g_charge_manager.path.preconnectTargetMv = final_target_mv;
     taskEXIT_CRITICAL();
 
     return final_target_mv;
@@ -97,21 +97,21 @@ uint8_t Charge_Manager_Cv_Entry_Ready(const bms_afe_data_t *afe,
 
 void Charge_Manager_Clear_Manual_Fet(void)
 {
-    g_charge_manager.manualFetActive = 0U;
-    g_charge_manager.manualFetMask = 0U;
+    g_charge_manager.manualFet.active = 0U;
+    g_charge_manager.manualFet.mask = 0U;
 }
 
 void Charge_Manager_Clear_Path_Settle_State_Unlocked(void)
 {
-    g_charge_manager.pathSettleRemainingMs = 0U;
-    g_charge_manager.lastBatteryPathEnabled = 0U;
-    g_charge_manager.pathSettleTargetMv = 0U;
+    g_charge_manager.path.settleRemainingMs = 0U;
+    g_charge_manager.path.lastBatteryPathEnabled = 0U;
+    g_charge_manager.path.settleTargetMv = 0U;
 }
 
 void Charge_Manager_Clear_Path_Settle_Unlocked(void)
 {
     Charge_Manager_Clear_Path_Settle_State_Unlocked();
-    g_charge_manager.preconnectTargetMv = 0U;
+    g_charge_manager.path.preconnectTargetMv = 0U;
 }
 
 void Charge_Manager_Clear_Path_Settle(void)
@@ -133,7 +133,7 @@ uint8_t Charge_Manager_Path_Settle_Active(void)
     uint8_t active;
 
     taskENTER_CRITICAL();
-    active = (g_charge_manager.pathSettleRemainingMs != 0U) ? 1U : 0U;
+    active = (g_charge_manager.path.settleRemainingMs != 0U) ? 1U : 0U;
     taskEXIT_CRITICAL();
 
     return active;
@@ -144,7 +144,7 @@ uint8_t Charge_Manager_Battery_Path_Rising_Edge(void)
     uint8_t rising_edge;
 
     taskENTER_CRITICAL();
-    rising_edge = (g_charge_manager.lastBatteryPathEnabled == 0U) ? 1U : 0U;
+    rising_edge = (g_charge_manager.path.lastBatteryPathEnabled == 0U) ? 1U : 0U;
     taskEXIT_CRITICAL();
 
     return rising_edge;
@@ -164,11 +164,11 @@ void Charge_Manager_Update_Path_Settle(uint8_t battery_path_enabled,
     target_mv = Charge_Manager_Preconnect_Target_Mv(afe, 0, params);
 
     taskENTER_CRITICAL();
-    if(g_charge_manager.lastBatteryPathEnabled == 0U) {
-        g_charge_manager.pathSettleRemainingMs = CHARGE_PATH_SETTLE_MS;
-        g_charge_manager.pathSettleTargetMv = target_mv;
+    if(g_charge_manager.path.lastBatteryPathEnabled == 0U) {
+        g_charge_manager.path.settleRemainingMs = CHARGE_PATH_SETTLE_MS;
+        g_charge_manager.path.settleTargetMv = target_mv;
     }
-    g_charge_manager.lastBatteryPathEnabled = 1U;
+    g_charge_manager.path.lastBatteryPathEnabled = 1U;
     taskEXIT_CRITICAL();
 }
 
@@ -179,14 +179,14 @@ void Charge_Manager_Decay_Path_Settle(uint32_t period_ms)
     }
 
     taskENTER_CRITICAL();
-    if(g_charge_manager.pathSettleRemainingMs != 0U) {
-        if(period_ms >= (uint32_t)g_charge_manager.pathSettleRemainingMs) {
-            g_charge_manager.pathSettleRemainingMs = 0U;
-            g_charge_manager.pathSettleTargetMv = 0U;
-            g_charge_manager.preconnectTargetMv = 0U;
+    if(g_charge_manager.path.settleRemainingMs != 0U) {
+        if(period_ms >= (uint32_t)g_charge_manager.path.settleRemainingMs) {
+            g_charge_manager.path.settleRemainingMs = 0U;
+            g_charge_manager.path.settleTargetMv = 0U;
+            g_charge_manager.path.preconnectTargetMv = 0U;
         } else {
-            g_charge_manager.pathSettleRemainingMs =
-                (uint16_t)((uint32_t)g_charge_manager.pathSettleRemainingMs - period_ms);
+            g_charge_manager.path.settleRemainingMs =
+                (uint16_t)((uint32_t)g_charge_manager.path.settleRemainingMs - period_ms);
         }
     }
     taskEXIT_CRITICAL();

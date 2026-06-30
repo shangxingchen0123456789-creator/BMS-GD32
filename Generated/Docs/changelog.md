@@ -2,6 +2,12 @@
 
 ## 2026-06-30
 
+- Split `power_control_context_t` into `loop`, `fault`, `transition`, and
+  `feedback` private sub-contexts.
+- Split `charge_manager_context_t` into `config`, `control`, `digital`,
+  `fault`, `manualFet`, and `path` private sub-contexts.
+- Updated generated structure tests to require grouped internal context access.
+
 - Removed transitional `s_xxx` internal context macro aliases from
   `power_control_internal.h` and `charge_manager_internal.h`.
 - Updated `power_control_*` and `charge_manager_*` real modules to access

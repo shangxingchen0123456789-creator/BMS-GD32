@@ -166,3 +166,42 @@ Program Size: Code=76340 RO-data=1896 RW-data=8 ZI-data=24592
 "..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
 Build Time Elapsed:  00:00:06
 ```
+
+## Internal Context Split Follow-up
+
+This round groups the private `power_control` and `charge_manager` contexts by
+responsibility. The public APIs and Keil compile-unit layout remain unchanged.
+
+`python Generated\Tests\run_tests.py` passed for this follow-up on 2026-06-30:
+
+```text
+PASS layer files exist
+PASS old moved paths removed
+PASS Keil FilePath entries resolve
+PASS Keil include paths use layers
+PASS no inc files remain
+PASS real internal modules referenced
+PASS internal context access is explicit
+PASS internal contexts are grouped
+PASS power pwm module extracted
+PASS generated files grouped
+SKIP optional C unit tests: no gcc, clang, or cl found on PATH
+```
+
+Keil UV4 command-line rebuild passed for this follow-up on 2026-06-30:
+
+```text
+compiling power_control_api.c...
+compiling power_control_safety.c...
+compiling charge_manager.c...
+compiling power_control_mode.c...
+compiling charge_manager_params.c...
+compiling power_control_limits.c...
+compiling charge_manager_path.c...
+compiling charge_manager_control.c...
+compiling charge_manager_commands.c...
+compiling charge_manager_faults.c...
+Program Size: Code=76340 RO-data=1896 RW-data=8 ZI-data=24592
+"..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:07
+```

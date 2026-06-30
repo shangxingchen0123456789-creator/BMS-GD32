@@ -57,19 +57,35 @@ typedef struct {
     uint16_t buckDutyX100;
     uint16_t boostDutyX100;
     uint8_t asyncBoostRectifier;
+} power_control_loop_context_t;
+
+typedef struct {
     uint8_t stallRecoverCount;
     uint16_t outputOvpCount;
     uint16_t outputOvpBlankCount;
     uint8_t outputOcpCount;
+    volatile uint8_t lockout;
+    volatile uint32_t status;
+} power_control_fault_context_t;
+
+typedef struct {
     uint8_t preconnectActive;
     uint16_t preconnectOvpLimitMv;
     uint16_t afeHandoverGuardCount;
+} power_control_transition_context_t;
+
+typedef struct {
     volatile int16_t batteryCurrentFeedbackMa;
     volatile uint8_t batteryCurrentFeedbackValid;
     volatile uint16_t batteryVoltageFeedbackMv;
     volatile uint8_t batteryVoltageFeedbackValid;
-    volatile uint8_t faultLockout;
-    volatile uint32_t faultStatus;
+} power_control_feedback_context_t;
+
+typedef struct {
+    power_control_loop_context_t loop;
+    power_control_fault_context_t fault;
+    power_control_transition_context_t transition;
+    power_control_feedback_context_t feedback;
 } power_control_context_t;
 
 extern power_control_context_t g_power_control;

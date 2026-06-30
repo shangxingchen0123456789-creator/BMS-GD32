@@ -6,8 +6,8 @@ uint16_t Charge_Manager_Target_Current_For_State(bms_charge_state_t state)
 
     /* 娑撴祦鍜屾亽鍘嬮樁娈垫湰璐ㄤ笂閮芥槸鍚屼竴涓姛鐜囩骇鐨勯檺娴佸伐浣滄ā寮忋€?*/
     if(state == BMS_CHARGE_STATE_TRICKLE) {
-        if(g_charge_manager.params.targetCurrentMa < TRICKLE_CURRENT_MA) {
-            target_current_ma = g_charge_manager.params.targetCurrentMa;
+        if(g_charge_manager.config.params.targetCurrentMa < TRICKLE_CURRENT_MA) {
+            target_current_ma = g_charge_manager.config.params.targetCurrentMa;
         } else {
             target_current_ma = TRICKLE_CURRENT_MA;
         }
@@ -19,14 +19,14 @@ uint16_t Charge_Manager_Target_Current_For_State(bms_charge_state_t state)
          * 鎭掑帇闃舵浠嶇劧鎶婄洰鏍囩數娴佷綔涓烘渶澶у厑璁哥數娴佷氦缁欏姛鐜囩幆銆?
          * 鐪熸璁╃數娴佽嚜鐒朵笅闄嶇殑鏄數鍘嬬幆锛沜utoffCurrentMa 鍙敤浜庡垽鏂厖鐢靛畬鎴愩€?
          */
-        return Power_Manager_Limit_Current(g_charge_manager.params.targetCurrentMa);
+        return Power_Manager_Limit_Current(g_charge_manager.config.params.targetCurrentMa);
     }
 
     if(state == BMS_CHARGE_STATE_CC) {
-        return Power_Manager_Limit_Current(g_charge_manager.params.targetCurrentMa);
+        return Power_Manager_Limit_Current(g_charge_manager.config.params.targetCurrentMa);
     }
 
-    return Power_Manager_Limit_Current(g_charge_manager.params.targetCurrentMa);
+    return Power_Manager_Limit_Current(g_charge_manager.config.params.targetCurrentMa);
 }
 
 uint8_t Charge_Manager_Control_Mode_For_State(uint8_t mode, bms_charge_state_t state)

@@ -35,16 +35,16 @@ void Charge_Manager_Update(uint32_t period_ms,
     }
 
     taskENTER_CRITICAL();
-    params = g_charge_manager.params;
-    state = g_charge_manager.state;
-    run_request = g_charge_manager.runRequest;
-    mode = g_charge_manager.mode;
-    work_mode = g_charge_manager.workMode;
-    digital_power_enabled = g_charge_manager.digitalPowerEnabled;
-    manual_fet_active = g_charge_manager.manualFetActive;
-    manual_fet_mask = g_charge_manager.manualFetMask;
-    digital_power_target_voltage_mv = g_charge_manager.digitalPowerTargetVoltageMv;
-    digital_power_current_limit_ma = g_charge_manager.digitalPowerCurrentLimitMa;
+    params = g_charge_manager.config.params;
+    state = g_charge_manager.control.state;
+    run_request = g_charge_manager.control.runRequest;
+    mode = g_charge_manager.control.mode;
+    work_mode = g_charge_manager.control.workMode;
+    digital_power_enabled = g_charge_manager.digital.enabled;
+    manual_fet_active = g_charge_manager.manualFet.active;
+    manual_fet_mask = g_charge_manager.manualFet.mask;
+    digital_power_target_voltage_mv = g_charge_manager.digital.targetVoltageMv;
+    digital_power_current_limit_ma = g_charge_manager.digital.currentLimitMa;
     taskEXIT_CRITICAL();
 
     power_requested = ((run_request != 0U) || (digital_power_enabled != 0U)) ? 1U : 0U;
@@ -142,15 +142,15 @@ void Charge_Manager_Update(uint32_t period_ms,
                (battery_current_ma >= 0) &&
                (battery_current_ma <= (int16_t)params.cutoffCurrentMa)) {
                 /* 闇€瑕佽繛缁娆′綆鐢垫祦閲囨牱锛屾墠鍒ゅ畾鍏呯數瀹屾垚锛岄伩鍏嶅伓鍙戞姈鍔ㄨ瑙﹀彂銆?*/
-                g_charge_manager.cvDoneCounter++;
-                if(g_charge_manager.cvDoneCounter > CV_DONE_CONFIRM_COUNT) {
+                g_charge_manager.control.cvDoneCounter++;
+                if(g_charge_manager.control.cvDoneCounter > CV_DONE_CONFIRM_COUNT) {
                     state = BMS_CHARGE_STATE_DONE;
                     run_request = 0U;
                     Charge_Manager_Clear_Path_Settle();
                     Power_Control_Stop();
                 }
             } else {
-                g_charge_manager.cvDoneCounter = 0U;
+                g_charge_manager.control.cvDoneCounter = 0U;
             }
         }
 
@@ -267,20 +267,20 @@ void Charge_Manager_Update(uint32_t period_ms,
     }
 
     taskENTER_CRITICAL();
-    g_charge_manager.state = state;
-    g_charge_manager.runRequest = run_request;
-    g_charge_manager.digitalPowerEnabled = digital_power_enabled;
-    g_charge_manager.manualFetActive = manual_fet_active;
-    g_charge_manager.manualFetMask = manual_fet_mask;
-    g_charge_manager.digitalPowerTargetVoltageMv = digital_power_target_voltage_mv;
-    g_charge_manager.digitalPowerCurrentLimitMa = digital_power_current_limit_ma;
+    g_charge_manager.control.state = state;
+    g_charge_manager.control.runRequest = run_request;
+    g_charge_manager.digital.enabled = digital_power_enabled;
+    g_charge_manager.manualFet.active = manual_fet_active;
+    g_charge_manager.manualFet.mask = manual_fet_mask;
+    g_charge_manager.digital.targetVoltageMv = digital_power_target_voltage_mv;
+    g_charge_manager.digital.currentLimitMa = digital_power_current_limit_ma;
     if((work_mode != (uint8_t)BMS_WORK_MODE_DIGITAL_POWER) &&
        (digital_power_enabled == 0U) &&
-       (g_charge_manager.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
+       (g_charge_manager.control.mode == (uint8_t)BMS_CHARGE_MODE_DIGITAL_POWER) &&
        ((faults == 0U) || (digital_power_fault_context == 0U))) {
-        g_charge_manager.mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
+        g_charge_manager.control.mode = (uint8_t)BMS_CHARGE_MODE_AUTO;
     } else {
-        g_charge_manager.mode = mode;
+        g_charge_manager.control.mode = mode;
     }
     taskEXIT_CRITICAL();
 }

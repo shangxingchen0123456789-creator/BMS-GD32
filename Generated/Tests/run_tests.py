@@ -81,6 +81,7 @@ GENERATED_EXPECTED_FILES = [
     "Docs/charge_manager_split_design.md",
     "Docs/coding_standard.md",
     "Docs/internal_context_access_design.md",
+    "Docs/internal_context_split_design.md",
     "Docs/power_control_split_design.md",
     "Docs/power_pwm_module_design.md",
     "Docs/remove_inc_modules_design.md",
@@ -92,6 +93,7 @@ GENERATED_EXPECTED_FILES = [
     "BuildLogs/uv4_power_pwm_module_rebuild_20260630.log",
     "BuildLogs/uv4_remove_inc_modules_rebuild_20260630.log",
     "BuildLogs/uv4_internal_context_access_rebuild_20260630.log",
+    "BuildLogs/uv4_internal_context_split_rebuild_20260630.log",
 ]
 
 OLD_GENERATED_PATHS = [
@@ -237,6 +239,51 @@ def assert_internal_context_access_explicit() -> None:
             fail(f"internal context aliases remain in {source_path}: {', '.join(aliases)}")
 
 
+def assert_internal_contexts_are_grouped() -> None:
+    power_header = (FW / "Driver" / "power_control_internal.h").read_text(encoding="utf-8")
+    charge_header = (FW / "Module" / "charge_manager_internal.h").read_text(encoding="utf-8")
+
+    for token in [
+        "power_control_loop_context_t loop",
+        "power_control_fault_context_t fault",
+        "power_control_transition_context_t transition",
+        "power_control_feedback_context_t feedback",
+    ]:
+        if token not in power_header:
+            fail(f"power_control_context_t missing grouped field: {token}")
+
+    for token in [
+        "charge_manager_config_context_t config",
+        "charge_manager_control_context_t control",
+        "charge_manager_digital_context_t digital",
+        "charge_manager_fault_context_t fault",
+        "charge_manager_manual_fet_context_t manualFet",
+        "charge_manager_path_context_t path",
+    ]:
+        if token not in charge_header:
+            fail(f"charge_manager_context_t missing grouped field: {token}")
+
+    target_sources = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in list((FW / "Driver").glob("power_control*.c")) +
+                   list((FW / "Module").glob("charge_manager*.c"))
+    )
+    for token in [
+        "g_power_control.loop.",
+        "g_power_control.fault.",
+        "g_power_control.transition.",
+        "g_power_control.feedback.",
+        "g_charge_manager.config.",
+        "g_charge_manager.control.",
+        "g_charge_manager.digital.",
+        "g_charge_manager.fault.",
+        "g_charge_manager.manualFet.",
+        "g_charge_manager.path.",
+    ]:
+        if token not in target_sources:
+            fail(f"grouped context access missing from modules: {token}")
+
+
 def assert_power_pwm_module() -> None:
     power_control = (FW / "Driver" / "power_control.c").read_text(encoding="utf-8")
     power_control_internal = (FW / "Driver" / "power_control_internal.h").read_text(encoding="utf-8")
@@ -320,6 +367,7 @@ def main() -> int:
         ("no inc files remain", assert_no_inc_files),
         ("real internal modules referenced", assert_real_internal_modules),
         ("internal context access is explicit", assert_internal_context_access_explicit),
+        ("internal contexts are grouped", assert_internal_contexts_are_grouped),
         ("power pwm module extracted", assert_power_pwm_module),
         ("generated files grouped", assert_generated_files_grouped),
     ]
