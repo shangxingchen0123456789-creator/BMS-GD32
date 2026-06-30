@@ -734,6 +734,31 @@
               <FileType>5</FileType>
               <FilePath>..\Driver\power_control.h</FilePath>
             </File>
+            <File>
+              <FileName>power_control_pwm.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\power_control_pwm.inc</FilePath>
+            </File>
+            <File>
+              <FileName>power_control_safety.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\power_control_safety.inc</FilePath>
+            </File>
+            <File>
+              <FileName>power_control_limits.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\power_control_limits.inc</FilePath>
+            </File>
+            <File>
+              <FileName>power_control_mode.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\power_control_mode.inc</FilePath>
+            </File>
+            <File>
+              <FileName>power_control_api.inc</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\power_control_api.inc</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -2,6 +2,12 @@
 
 ## 2026-06-30
 
+- 拆分 `Driver/power_control.c` 内部实现，新增 `power_control_pwm.inc`、`power_control_safety.inc`、`power_control_limits.inc`、`power_control_mode.inc`、`power_control_api.inc`。
+- 保留 `power_control.c` 作为唯一编译单元和外观入口，外部 API 与 `power_control.h` 不变。
+- 新增 `Generated/Docs/power_control_split_design.md`，记录 PWM、保护、限制、模式映射和 API/快环的分片边界。
+- 更新 Keil 工程 Driver 分组，使 power control 内部分片可见但不作为独立编译单元。
+- 更新 `Generated/Tests/run_tests.py`，检查 power control 内部分片存在且包含顺序正确。
+- 已验证展开后的 `power_control.c` 内容与拆分前 `HEAD` 完全一致。
 - 将生成资料集中到 `Generated` 目录，包括设计文档、测试脚本、归档 Markdown 和文本构建日志。
 - 新增 `Generated/README.md` 作为生成资料入口，说明 `Docs`、`Tests`、`BuildLogs` 的边界。
 - 更新测试入口为 `python Generated\Tests\run_tests.py`，并增加生成资料归档检查。

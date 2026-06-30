@@ -30,6 +30,11 @@ EXPECTED_FILES = [
     "Driver/afe_gd30bm2016.c",
     "Driver/flash_storage.c",
     "Driver/power_control.c",
+    "Driver/power_control_api.inc",
+    "Driver/power_control_limits.inc",
+    "Driver/power_control_mode.inc",
+    "Driver/power_control_pwm.inc",
+    "Driver/power_control_safety.inc",
     "Module/balance_manager.c",
     "Module/charge_manager.c",
     "Module/charge_manager_commands.inc",
@@ -56,16 +61,26 @@ CHARGE_MANAGER_FRAGMENTS = [
     'charge_manager_commands.inc',
 ]
 
+POWER_CONTROL_FRAGMENTS = [
+    'power_control_pwm.inc',
+    'power_control_safety.inc',
+    'power_control_limits.inc',
+    'power_control_mode.inc',
+    'power_control_api.inc',
+]
+
 GENERATED_EXPECTED_FILES = [
     "README.md",
     "Docs/architecture.md",
     "Docs/changelog.md",
     "Docs/charge_manager_split_design.md",
     "Docs/coding_standard.md",
+    "Docs/power_control_split_design.md",
     "Docs/test_report.md",
     "Tests/run_tests.py",
     "Tests/unit/test_common_logic.c",
     "BuildLogs/codex_build_async_fix.log",
+    "BuildLogs/uv4_power_control_split_rebuild_20260630.log",
 ]
 
 OLD_GENERATED_PATHS = [
@@ -179,6 +194,19 @@ def assert_charge_manager_fragments() -> None:
         last_index = index
 
 
+def assert_power_control_fragments() -> None:
+    source = (FW / "Driver" / "power_control.c").read_text(encoding="utf-8")
+    last_index = -1
+    for fragment in POWER_CONTROL_FRAGMENTS:
+        token = f'#include "{fragment}"'
+        index = source.find(token)
+        if index < 0:
+            fail(f"power_control.c missing internal fragment include: {fragment}")
+        if index <= last_index:
+            fail(f"power_control internal fragment order is wrong near: {fragment}")
+        last_index = index
+
+
 def assert_generated_files_grouped() -> None:
     for rel in GENERATED_EXPECTED_FILES:
         path = GENERATED / rel
@@ -242,6 +270,7 @@ def main() -> int:
         ("Keil FilePath entries resolve", assert_keil_paths_resolve),
         ("Keil include paths use layers", assert_keil_uses_layers),
         ("charge manager fragments included", assert_charge_manager_fragments),
+        ("power control fragments included", assert_power_control_fragments),
         ("generated files grouped", assert_generated_files_grouped),
     ]
 
