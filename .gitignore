@@ -1,0 +1,18 @@
+# Build outputs
+GD32G553/Output/
+GD32G553/Project/Objects/
+GD32G553/Project/Listings/
+
+# Keil user/workspace files
+GD32G553/Project/*.uvoptx
+GD32G553/Project/*.uvguix.*
+
+# Codex and local build logs
+GD32G553/Project/codex_build_*.log
+
+# Generic editor and OS noise
+*.swp
+*.swo
+*~
+Thumbs.db
+.DS_Store
