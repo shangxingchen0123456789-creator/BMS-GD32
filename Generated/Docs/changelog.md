@@ -2,6 +2,14 @@
 
 ## 2026-06-30
 
+- Extracted the BM2016 bit-banged I2C transport from `afe_gd30bm2016.c` into
+  `afe_gd30bm2016_transport.c/.h`.
+- Kept the public AFE API and BM2016 register/configuration logic unchanged,
+  while moving raw I2C GPIO setup, byte transfer, bus recovery, delay, and
+  mutex handling into the private transport module.
+- Added generated tests to require the transport module, Keil references, and
+  removal of low-level I2C helpers from the main AFE driver.
+
 - Refactored `Power_Control_Fast_Loop` into local helpers for fast protection,
   current preparation, PI update, duty limiting, PWM mapping, and final service.
 - Added generated tests to keep `Power_Control_Fast_Loop` as a short

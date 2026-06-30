@@ -167,6 +167,41 @@ Program Size: Code=76340 RO-data=1896 RW-data=8 ZI-data=24592
 Build Time Elapsed:  00:00:06
 ```
 
+## AFE Transport Module Follow-up
+
+This round keeps `afe_gd30bm2016.h` and the BM2016 protocol behavior unchanged,
+but moves the bit-banged I2C transport, GPIO setup, raw read/write path, delay,
+and I2C mutex into `afe_gd30bm2016_transport.c/.h`.
+
+`python Generated\Tests\run_tests.py` passed for this follow-up on 2026-06-30:
+
+```text
+PASS layer files exist
+PASS old moved paths removed
+PASS Keil FilePath entries resolve
+PASS Keil include paths use layers
+PASS no inc files remain
+PASS real internal modules referenced
+PASS internal context access is explicit
+PASS internal contexts are grouped
+PASS power pwm module extracted
+PASS charge update uses helpers
+PASS power fast loop uses helpers
+PASS afe transport module extracted
+PASS generated files grouped
+SKIP optional C unit tests: no gcc, clang, or cl found on PATH
+```
+
+Keil UV4 command-line rebuild passed for this follow-up on 2026-06-30:
+
+```text
+compiling afe_gd30bm2016_transport.c...
+compiling afe_gd30bm2016.c...
+Program Size: Code=77000 RO-data=1896 RW-data=8 ZI-data=24592
+"..\Output\GD32G553_CHG.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:10
+```
+
 ## Internal Context Split Follow-up
 
 This round groups the private `power_control` and `charge_manager` contexts by

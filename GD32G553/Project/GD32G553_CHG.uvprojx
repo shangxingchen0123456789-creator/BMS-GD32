@@ -705,9 +705,19 @@
               <FilePath>..\Driver\afe_gd30bm2016.c</FilePath>
             </File>
             <File>
+              <FileName>afe_gd30bm2016_transport.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\afe_gd30bm2016_transport.c</FilePath>
+            </File>
+            <File>
               <FileName>afe_gd30bm2016.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Driver\afe_gd30bm2016.h</FilePath>
+            </File>
+            <File>
+              <FileName>afe_gd30bm2016_transport.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\afe_gd30bm2016_transport.h</FilePath>
             </File>
             <File>
               <FileName>afe_gd30bm2016_regs.h</FileName>

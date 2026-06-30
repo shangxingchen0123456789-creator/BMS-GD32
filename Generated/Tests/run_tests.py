@@ -29,6 +29,8 @@ EXPECTED_FILES = [
     "Config/bms_board_config.h",
     "Driver/adc_manager.c",
     "Driver/afe_gd30bm2016.c",
+    "Driver/afe_gd30bm2016_transport.c",
+    "Driver/afe_gd30bm2016_transport.h",
     "Driver/flash_storage.c",
     "Driver/power_control.c",
     "Driver/power_control_api.c",
@@ -77,6 +79,7 @@ POWER_CONTROL_MODULES = [
 GENERATED_EXPECTED_FILES = [
     "README.md",
     "Docs/architecture.md",
+    "Docs/afe_transport_module_design.md",
     "Docs/changelog.md",
     "Docs/charge_manager_update_helpers_design.md",
     "Docs/charge_manager_split_design.md",
@@ -98,6 +101,7 @@ GENERATED_EXPECTED_FILES = [
     "BuildLogs/uv4_internal_context_split_rebuild_20260630.log",
     "BuildLogs/uv4_charge_update_helpers_rebuild_20260630.log",
     "BuildLogs/uv4_power_fast_loop_helpers_rebuild_20260630.log",
+    "BuildLogs/uv4_afe_transport_module_rebuild_20260630.log",
 ]
 
 OLD_GENERATED_PATHS = [
@@ -357,6 +361,40 @@ def assert_power_fast_loop_uses_helpers() -> None:
         fail("Power_Control_Fast_Loop orchestration body grew too long")
 
 
+def assert_afe_transport_module() -> None:
+    driver_source = (FW / "Driver" / "afe_gd30bm2016.c").read_text(encoding="utf-8")
+    transport_source = (FW / "Driver" / "afe_gd30bm2016_transport.c").read_text(encoding="utf-8")
+    project_paths = project_file_paths()
+
+    for token in [
+        "Afe_I2c_Write_Byte",
+        "Afe_I2c_Read_Byte",
+        "Afe_I2c_Start",
+        "Afe_I2c_Stop",
+        "s_i2c_mutex",
+    ]:
+        if token in driver_source:
+            fail(f"AFE main driver still owns transport detail: {token}")
+        if token not in transport_source:
+            fail(f"AFE transport module missing expected detail: {token}")
+
+    for token in [
+        "Afe_Gd30bm2016_Transport_Write_Raw",
+        "Afe_Gd30bm2016_Transport_Read_Raw",
+        "Afe_Gd30bm2016_Transport_Lock",
+        "Afe_Gd30bm2016_Transport_Delay_Ms",
+    ]:
+        if token not in driver_source:
+            fail(f"AFE main driver does not use transport API: {token}")
+
+    for rel in [
+        "..\\Driver\\afe_gd30bm2016_transport.c",
+        "..\\Driver\\afe_gd30bm2016_transport.h",
+    ]:
+        if rel not in project_paths:
+            fail(f"Keil project missing AFE transport file: {rel}")
+
+
 def assert_generated_files_grouped() -> None:
     for rel in GENERATED_EXPECTED_FILES:
         path = GENERATED / rel
@@ -426,6 +464,7 @@ def main() -> int:
         ("power pwm module extracted", assert_power_pwm_module),
         ("charge update uses helpers", assert_charge_update_uses_helpers),
         ("power fast loop uses helpers", assert_power_fast_loop_uses_helpers),
+        ("afe transport module extracted", assert_afe_transport_module),
         ("generated files grouped", assert_generated_files_grouped),
     ]
 

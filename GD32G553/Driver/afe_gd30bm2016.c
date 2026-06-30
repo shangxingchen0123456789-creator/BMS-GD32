@@ -1,17 +1,15 @@
 #include "afe_gd30bm2016.h"
+#include "afe_gd30bm2016_transport.h"
 
 #include "afe_gd30bm2016_regs.h"
 #include "bms_board_config.h"
 
 #include "FreeRTOS.h"
-#include "semphr.h"
 #include "task.h"
 
 #include <string.h>
 
 
-#define AFE_I2C_DELAY_CYCLES                  5000U
-#define AFE_1MS_DELAY_CYCLES                  120000U
 #define AFE_RECOVER_PERIOD_MS                 500U
 #define AFE_I2C_CRC_FRAME_MAX                 8U
 
@@ -92,7 +90,6 @@ typedef struct {
 #define GD30BM2016_FET_ENABLE_RETRY_COUNT     3U
 #define GD30BM2016_FET_ENABLE_RETRY_DELAY_MS  20U
 
-static SemaphoreHandle_t s_i2c_mutex;
 static uint8_t s_i2c_ready;
 static uint8_t s_i2c_addr_write;
 static TickType_t s_last_recover_tick;
@@ -268,294 +265,6 @@ static int16_t Gd30_Sanitize_Temperature_X10(int16_t temperature_x10)
     return temperature_x10;
 }
 
-static uint8_t Gd30_I2c_Lock(TickType_t timeout)
-{
-    if(s_i2c_mutex == 0) {
-        return 1U;
-    }
-    if(xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
-        return 1U;
-    }
-
-    return (xSemaphoreTake(s_i2c_mutex, timeout) == pdTRUE) ? 1U : 0U;
-}
-
-static void Gd30_I2c_Unlock(void)
-{
-    if((s_i2c_mutex != 0) &&
-       (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)) {
-        (void)xSemaphoreGive(s_i2c_mutex);
-    }
-}
-
-static void Afe_Delay_Cycles(uint32_t cycles)
-{
-    volatile uint32_t i;
-
-    for(i = 0U; i < cycles; i++) {
-        __NOP();
-    }
-}
-
-static void Afe_Delay_Ms(uint32_t ms)
-{
-    uint32_t i;
-
-    if((ms != 0U) &&
-       (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)) {
-        vTaskDelay(pdMS_TO_TICKS(ms));
-        return;
-    }
-
-    for(i = 0U; i < ms; i++) {
-        Afe_Delay_Cycles(AFE_1MS_DELAY_CYCLES);
-    }
-}
-
-static void Afe_I2c_Delay(void)
-{
-    Afe_Delay_Cycles(AFE_I2C_DELAY_CYCLES);
-}
-
-static void Afe_I2c_Scl_High(void)
-{
-    gpio_bit_set(BMS_AFE_I2C_GPIO_PORT, BMS_AFE_I2C_SCL_PIN);
-}
-
-static void Afe_I2c_Scl_Low(void)
-{
-    gpio_bit_reset(BMS_AFE_I2C_GPIO_PORT, BMS_AFE_I2C_SCL_PIN);
-}
-
-static void Afe_I2c_Sda_Release(void)
-{
-    gpio_bit_set(BMS_AFE_I2C_GPIO_PORT, BMS_AFE_I2C_SDA_PIN);
-    gpio_mode_set(BMS_AFE_I2C_GPIO_PORT,
-                  GPIO_MODE_INPUT,
-                  GPIO_PUPD_PULLUP,
-                  BMS_AFE_I2C_SDA_PIN);
-}
-
-static void Afe_I2c_Sda_Drive_Low(void)
-{
-    gpio_bit_reset(BMS_AFE_I2C_GPIO_PORT, BMS_AFE_I2C_SDA_PIN);
-    gpio_mode_set(BMS_AFE_I2C_GPIO_PORT,
-                  GPIO_MODE_OUTPUT,
-                  GPIO_PUPD_NONE,
-                  BMS_AFE_I2C_SDA_PIN);
-    gpio_output_options_set(BMS_AFE_I2C_GPIO_PORT,
-                            GPIO_OTYPE_OD,
-                            GPIO_OSPEED_60MHZ,
-                            BMS_AFE_I2C_SDA_PIN);
-}
-
-static void Afe_I2c_Sda_High(void)
-{
-    Afe_I2c_Sda_Release();
-}
-
-static void Afe_I2c_Sda_Low(void)
-{
-    Afe_I2c_Sda_Drive_Low();
-}
-
-static uint8_t Afe_I2c_Sda_Is_High(void)
-{
-    return (RESET != gpio_input_bit_get(BMS_AFE_I2C_GPIO_PORT, BMS_AFE_I2C_SDA_PIN)) ? 1U : 0U;
-}
-
-static void Afe_I2c_Start(void)
-{
-    Afe_I2c_Sda_High();
-    Afe_I2c_Scl_High();
-    Afe_I2c_Delay();
-    Afe_I2c_Sda_Low();
-    Afe_I2c_Delay();
-    Afe_I2c_Scl_Low();
-    Afe_I2c_Delay();
-}
-
-static void Afe_I2c_Stop(void)
-{
-    Afe_I2c_Sda_Low();
-    Afe_I2c_Delay();
-    Afe_I2c_Scl_High();
-    Afe_I2c_Delay();
-    Afe_I2c_Sda_High();
-    Afe_I2c_Delay();
-}
-
-static void Afe_I2c_Bus_Recover(void)
-{
-    uint8_t i;
-
-    Afe_I2c_Sda_High();
-    for(i = 0U; i < 9U; i++) {
-        Afe_I2c_Scl_Low();
-        Afe_I2c_Delay();
-        Afe_I2c_Scl_High();
-        Afe_I2c_Delay();
-    }
-    Afe_I2c_Stop();
-}
-
-static uint8_t Afe_I2c_Write_Byte(uint8_t value)
-{
-    uint8_t i;
-    uint8_t ack;
-
-    for(i = 0U; i < 8U; i++) {
-        if((value & 0x80U) != 0U) {
-            Afe_I2c_Sda_High();
-        } else {
-            Afe_I2c_Sda_Low();
-        }
-        Afe_I2c_Delay();
-        Afe_I2c_Scl_High();
-        Afe_I2c_Delay();
-        Afe_I2c_Scl_Low();
-        Afe_I2c_Delay();
-        value <<= 1U;
-    }
-
-    Afe_I2c_Sda_High();
-    Afe_I2c_Delay();
-    Afe_I2c_Scl_High();
-    Afe_I2c_Delay();
-    ack = (Afe_I2c_Sda_Is_High() == 0U) ? 1U : 0U;
-    Afe_I2c_Scl_Low();
-    Afe_I2c_Delay();
-    Afe_I2c_Sda_High();
-    Afe_I2c_Delay();
-
-    return ack;
-}
-
-static uint8_t Afe_I2c_Read_Byte(uint8_t ack)
-{
-    uint8_t i;
-    uint8_t value;
-
-    value = 0U;
-    Afe_I2c_Sda_High();
-    for(i = 0U; i < 8U; i++) {
-        value <<= 1U;
-        Afe_I2c_Delay();
-        Afe_I2c_Scl_High();
-        Afe_I2c_Delay();
-        if(Afe_I2c_Sda_Is_High() != 0U) {
-            value |= 1U;
-        }
-        Afe_I2c_Scl_Low();
-        Afe_I2c_Delay();
-    }
-
-    if(ack != 0U) {
-        Afe_I2c_Sda_Low();
-    } else {
-        Afe_I2c_Sda_High();
-    }
-    Afe_I2c_Delay();
-    Afe_I2c_Scl_High();
-    Afe_I2c_Delay();
-    Afe_I2c_Scl_Low();
-    Afe_I2c_Delay();
-    Afe_I2c_Sda_High();
-
-    return value;
-}
-
-static void Afe_I2c_Gpio_Init(void)
-{
-    rcu_periph_clock_enable(BMS_AFE_I2C_GPIO_CLK);
-    rcu_periph_clock_enable(BMS_AFE_RST_GPIO_CLK);
-    rcu_periph_clock_enable(BMS_AFE_ALERT_GPIO_CLK);
-    rcu_periph_clock_enable(BMS_AFE_DDSG_DCHG_GPIO_CLK);
-    rcu_periph_clock_enable(BMS_AFE_DFETOFF_GPIO_CLK);
-
-    gpio_bit_reset(BMS_AFE_RST_GPIO_PORT, BMS_AFE_RST_PIN);
-    gpio_mode_set(BMS_AFE_RST_GPIO_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLDOWN, BMS_AFE_RST_PIN);
-    gpio_output_options_set(BMS_AFE_RST_GPIO_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, BMS_AFE_RST_PIN);
-    gpio_bit_reset(BMS_AFE_RST_GPIO_PORT, BMS_AFE_RST_PIN);
-    Afe_Delay_Ms(5U);
-
-    gpio_bit_reset(BMS_AFE_I2C_GPIO_PORT, BMS_AFE_I2C_ADDR0_PIN | BMS_AFE_I2C_ADDR1_PIN);
-    gpio_mode_set(BMS_AFE_I2C_GPIO_PORT,
-                  GPIO_MODE_OUTPUT,
-                  GPIO_PUPD_PULLDOWN,
-                  BMS_AFE_I2C_ADDR0_PIN | BMS_AFE_I2C_ADDR1_PIN);
-    gpio_output_options_set(BMS_AFE_I2C_GPIO_PORT,
-                            GPIO_OTYPE_PP,
-                            GPIO_OSPEED_60MHZ,
-                            BMS_AFE_I2C_ADDR0_PIN | BMS_AFE_I2C_ADDR1_PIN);
-
-    gpio_bit_set(BMS_AFE_I2C_GPIO_PORT, BMS_AFE_I2C_SCL_PIN | BMS_AFE_I2C_SDA_PIN);
-    gpio_mode_set(BMS_AFE_I2C_GPIO_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, BMS_AFE_I2C_SCL_PIN);
-    gpio_output_options_set(BMS_AFE_I2C_GPIO_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, BMS_AFE_I2C_SCL_PIN);
-    Afe_I2c_Sda_Release();
-    Afe_I2c_Bus_Recover();
-
-    gpio_mode_set(BMS_AFE_ALERT_GPIO_PORT, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, BMS_AFE_ALERT_PIN);
-    gpio_mode_set(BMS_AFE_DDSG_DCHG_GPIO_PORT, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, BMS_AFE_DDSG_PIN | BMS_AFE_DCHG_PIN);
-    gpio_bit_reset(BMS_AFE_DFETOFF_GPIO_PORT, BMS_AFE_DFETOFF_PIN);
-    gpio_mode_set(BMS_AFE_DFETOFF_GPIO_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, BMS_AFE_DFETOFF_PIN);
-    gpio_output_options_set(BMS_AFE_DFETOFF_GPIO_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_60MHZ, BMS_AFE_DFETOFF_PIN);
-}
-
-static uint8_t Afe_I2c_Write_Raw(uint8_t address, uint8_t reg_addr, const uint8_t *data, uint8_t length)
-{
-    uint8_t ok;
-
-    if((data == 0) || (length == 0U)) {
-        return 0U;
-    }
-
-    ok = 1U;
-    Afe_I2c_Start();
-    ok = Afe_I2c_Write_Byte(address);
-    if(ok != 0U) {
-        ok = Afe_I2c_Write_Byte(reg_addr);
-    }
-    while((length-- != 0U) && (ok != 0U)) {
-        ok = Afe_I2c_Write_Byte(*data);
-        data++;
-    }
-    Afe_I2c_Stop();
-
-    return ok;
-}
-
-static uint8_t Afe_I2c_Read_Raw(uint8_t address, uint8_t reg_addr, uint8_t *data, uint8_t length)
-{
-    uint8_t ok;
-    uint8_t i;
-
-    if((data == 0) || (length == 0U)) {
-        return 0U;
-    }
-
-    ok = 1U;
-    Afe_I2c_Start();
-    ok = Afe_I2c_Write_Byte(address);
-    if(ok != 0U) {
-        ok = Afe_I2c_Write_Byte(reg_addr);
-    }
-    if(ok != 0U) {
-        Afe_I2c_Start();
-        ok = Afe_I2c_Write_Byte((uint8_t)(address | 0x01U));
-    }
-    for(i = 0U; (i < length) && (ok != 0U); i++) {
-        data[i] = Afe_I2c_Read_Byte((i + 1U) < length);
-    }
-    Afe_I2c_Stop();
-
-    if(ok == 0U) {
-        memset(data, 0, length);
-    }
-
-    return ok;
-}
-
 static uint8_t Gd30_I2c_Crc8(const uint8_t *data, uint8_t length)
 {
     uint8_t crc;
@@ -606,8 +315,8 @@ static uint8_t Gd30_Direct_Write(uint8_t address, const uint8_t *data, uint8_t l
     tx[length] = Gd30_I2c_Crc8(crc_input, (uint8_t)(length + 2U));
     g_afe_gd30_i2c_last_crc_calc = tx[length];
 
-    if(0U == Afe_I2c_Write_Raw(s_i2c_addr_write, address, tx, (uint8_t)(length + 1U))) {
-        if(0U == Afe_I2c_Write_Raw(s_i2c_addr_write, address, data, length)) {
+    if(0U == Afe_Gd30bm2016_Transport_Write_Raw(s_i2c_addr_write, address, tx, (uint8_t)(length + 1U))) {
+        if(0U == Afe_Gd30bm2016_Transport_Write_Raw(s_i2c_addr_write, address, data, length)) {
             return 0U;
         }
         g_afe_gd30_i2c_last_crc_ok = 2U;
@@ -634,8 +343,8 @@ static uint8_t Gd30_Direct_Read(uint8_t address, uint8_t *data, uint8_t length)
     g_afe_gd30_i2c_last_reg = address;
     g_afe_gd30_i2c_last_crc_ok = 0U;
 
-    if(0U == Afe_I2c_Read_Raw(s_i2c_addr_write, address, rx, (uint8_t)(length + 1U))) {
-        if(0U == Afe_I2c_Read_Raw(s_i2c_addr_write, address, data, length)) {
+    if(0U == Afe_Gd30bm2016_Transport_Read_Raw(s_i2c_addr_write, address, rx, (uint8_t)(length + 1U))) {
+        if(0U == Afe_Gd30bm2016_Transport_Read_Raw(s_i2c_addr_write, address, data, length)) {
             memset(data, 0, length);
             return 0U;
         }
@@ -654,7 +363,7 @@ static uint8_t Gd30_Direct_Read(uint8_t address, uint8_t *data, uint8_t length)
     g_afe_gd30_i2c_last_crc_calc = crc;
     g_afe_gd30_i2c_last_crc_rx = rx[length];
     if(crc != rx[length]) {
-        if(0U == Afe_I2c_Read_Raw(s_i2c_addr_write, address, data, length)) {
+        if(0U == Afe_Gd30bm2016_Transport_Read_Raw(s_i2c_addr_write, address, data, length)) {
             memset(data, 0, length);
             return 0U;
         }
@@ -755,7 +464,7 @@ static uint8_t Gd30_Subcommand_Data_Write(uint16_t command, uint32_t value, uint
     if(0U == Gd30_Direct_Write(GD30BM2016_DIR_SUBCMD, cmd, 2U)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     meta[0] = Gd30_Checksum(bytes, length);
     meta[1] = (uint8_t)(0x80U | length);
@@ -763,13 +472,13 @@ static uint8_t Gd30_Subcommand_Data_Write(uint16_t command, uint32_t value, uint
     if(0U == Gd30_Direct_Write(GD30BM2016_DIR_SUBCMD_CHECKSUM_LEN, meta, 2U)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     g_afe_gd30_config_fail_step = GD30_CFG_FAIL_STEP_DATA;
     if(0U == Gd30_Direct_Write(GD30BM2016_DIR_SUBCMD_DATA, bytes, length)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     g_afe_gd30_config_fail_step = GD30_CFG_FAIL_STEP_NONE;
     return 1U;
@@ -796,20 +505,20 @@ static uint8_t Gd30_Data_Memory_Read(uint16_t address, uint8_t *data, uint8_t le
     if(0U == Gd30_Direct_Write(GD30BM2016_DIR_SUBCMD, cmd, 2U)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     read_len = length;
     g_afe_gd30_config_fail_step = GD30_CFG_FAIL_STEP_READ_LEN;
     if(0U == Gd30_Direct_Write(GD30BM2016_DIR_SUBCMD_READ_LEN, &read_len, 1U)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     g_afe_gd30_config_fail_step = GD30_CFG_FAIL_STEP_READ_DATA;
     if(0U == Gd30_Direct_Read(GD30BM2016_DIR_SUBCMD_DATA, data, length)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     g_afe_gd30_config_fail_step = GD30_CFG_FAIL_STEP_NONE;
     return 1U;
@@ -827,7 +536,7 @@ static uint8_t Gd30_Wait_Cfgupdate(void)
 
     status = 0U;
     for(retry = 0U; retry < 20U; retry++) {
-        Afe_Delay_Ms(5U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(5U);
         if(0U != Gd30_Read_Battery_Status(&status)) {
             g_afe_gd30_last_battery_status = status;
             if((status & 0x0001U) != 0U) {
@@ -853,7 +562,7 @@ static uint8_t Gd30_I2c_Select_Address(void)
         s_i2c_addr_write = s_addr_candidates[i];
         g_afe_gd30_i2c_addr_write = s_i2c_addr_write;
         if(0U != Gd30_Subcommand_Only(GD30BM2016_SUBCMD_SLEEP_DISABLE)) {
-            Afe_Delay_Ms(1U);
+            Afe_Gd30bm2016_Transport_Delay_Ms(1U);
             return 1U;
         }
     }
@@ -886,7 +595,7 @@ static uint8_t Gd30_Enter_Config_Update(void)
     if(0U == Gd30_Subcommand_Only(GD30BM2016_SUBCMD_SEAL)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     g_afe_gd30_config_fail_reg = GD30BM2016_CMD_ACCESS_KEYSTEP1;
     g_afe_gd30_config_fail_stage = GD30_CFG_FAIL_KEY1;
@@ -920,7 +629,7 @@ static uint8_t Gd30_Exit_Config_Update(void)
     if(0U == Gd30_Subcommand_Only(GD30BM2016_SUBCMD_EXIT_CFGUPDATE)) {
         return 0U;
     }
-    Afe_Delay_Ms(10U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(10U);
     g_afe_gd30_cfgupdate_seen = 0U;
 
     return 1U;
@@ -964,7 +673,7 @@ static uint8_t Gd30_Configure_Defaults(void)
     if(0U == Gd30_Subcommand_Only(GD30BM2016_SUBCMD_SLEEP_DISABLE)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     g_afe_gd30_config_fail_stage = GD30_CFG_FAIL_NONE;
     g_afe_gd30_config_fail_step = GD30_CFG_FAIL_STEP_NONE;
@@ -1005,7 +714,7 @@ static uint8_t Gd30_Probe_Ready(void)
 
 static uint8_t Gd30_Start_I2c_Link(void)
 {
-    Afe_I2c_Gpio_Init();
+    Afe_Gd30bm2016_Transport_Gpio_Init();
     if(0U == Gd30_I2c_Select_Address()) {
         return 0U;
     }
@@ -1013,11 +722,11 @@ static uint8_t Gd30_Start_I2c_Link(void)
     if(0U == Gd30_Subcommand_Only(GD30BM2016_SUBCMD_SLEEP_DISABLE)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
     if(0U == Gd30_Subcommand_Only(GD30BM2016_SUBCMD_SLEEP_DISABLE)) {
         return 0U;
     }
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     if(0U == Gd30_Configure_Defaults()) {
         return 0U;
@@ -1255,12 +964,12 @@ static void Gd30_Prepare_Fet_Command_Mode(void)
         g_afe_gd30_last_battery_status = battery_status;
         if((battery_status & 0x0001U) != 0U) {
             (void)Gd30_Exit_Config_Update();
-            Afe_Delay_Ms(5U);
+            Afe_Gd30bm2016_Transport_Delay_Ms(5U);
         }
     }
 
     (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_SLEEP_DISABLE);
-    Afe_Delay_Ms(2U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(2U);
 }
 
 static uint8_t Gd30_Set_Normal_Fet_Control(uint8_t normal_enable)
@@ -1296,7 +1005,7 @@ static uint8_t Gd30_Set_Normal_Fet_Control(uint8_t normal_enable)
         if(0U == Gd30_Subcommand_Only(GD30BM2016_SUBCMD_FET_ENABLE)) {
             return 0U;
         }
-        Afe_Delay_Ms(GD30BM2016_FET_ENABLE_RETRY_DELAY_MS);
+        Afe_Gd30bm2016_Transport_Delay_Ms(GD30BM2016_FET_ENABLE_RETRY_DELAY_MS);
 
         if(0U == Gd30_Read_Manufacturing_Status(&manufacturing_status)) {
             return 0U;
@@ -1320,21 +1029,21 @@ static uint8_t Gd30_Apply_Normal_Fets_Off(uint8_t *status)
     }
 
     gpio_bit_set(BMS_AFE_DFETOFF_GPIO_PORT, BMS_AFE_DFETOFF_PIN);
-    Afe_Delay_Ms(1U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(1U);
 
     ok = Gd30_Subcommand_Data_Write(GD30BM2016_CMD_FET_CONTROL,
                                     GD30BM2016_FET_CONTROL_ALL_OFF,
                                     1U);
     if(ok != 0U) {
-        Afe_Delay_Ms(1U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(1U);
         (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_CHG_PCHG_OFF);
-        Afe_Delay_Ms(1U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(1U);
         (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_DSG_PDSG_OFF);
-        Afe_Delay_Ms(1U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(1U);
         (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_ALL_FETS_OFF);
     }
 
-    Afe_Delay_Ms(2U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(2U);
 
     if((ok != 0U) && (status != 0)) {
         ok = Gd30_Direct_Read(GD30BM2016_DIR_FET_STATUS, status, 1U);
@@ -1353,18 +1062,18 @@ static uint8_t Gd30_Apply_Normal_Fets_On( uint8_t *status)
     }
 
     gpio_bit_reset(BMS_AFE_DFETOFF_GPIO_PORT, BMS_AFE_DFETOFF_PIN);
-    Afe_Delay_Ms(2U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(2U);
 
     ok = Gd30_Set_Normal_Fet_Control(1U);
     if(ok != 0U) {
         ok = Gd30_Subcommand_Only(GD30BM2016_SUBCMD_ALL_FETS_ON);
     }
     if(ok != 0U) {
-        Afe_Delay_Ms(10U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(10U);
         ok = Gd30_Subcommand_Data_Write(GD30BM2016_CMD_FET_CONTROL, 0U, 1U);
     }
 
-    Afe_Delay_Ms(10U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(10U);
 
     if((ok != 0U) && (status != 0)) {
         for(retry = 0U; retry < 5U; retry++) {
@@ -1373,7 +1082,7 @@ static uint8_t Gd30_Apply_Normal_Fets_On( uint8_t *status)
                ((*status & GD30BM2016_MAIN_PATH_FET_MASK) == GD30BM2016_MAIN_PATH_FET_MASK)) {
                 break;
             }
-            Afe_Delay_Ms(10U);
+            Afe_Gd30bm2016_Transport_Delay_Ms(10U);
         }
     }
 
@@ -1459,34 +1168,34 @@ static uint8_t Gd30_Apply_Normal_Fet_Mask(uint8_t fet_mask, uint8_t *status)
 
     if(fet_mask != 0U) {
         gpio_bit_reset(BMS_AFE_DFETOFF_GPIO_PORT, BMS_AFE_DFETOFF_PIN);
-        Afe_Delay_Ms(2U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(2U);
 
         ok = Gd30_Set_Normal_Fet_Control(1U);
         if(ok != 0U) {
             ok = Gd30_Subcommand_Only(GD30BM2016_SUBCMD_ALL_FETS_ON);
         }
         if(ok != 0U) {
-            Afe_Delay_Ms(10U);
+            Afe_Gd30bm2016_Transport_Delay_Ms(10U);
             off_bits = Gd30_Fet_Control_Off_Bits_From_Mask(fet_mask);
             ok = Gd30_Subcommand_Data_Write(GD30BM2016_CMD_FET_CONTROL, off_bits, 1U);
         }
     } else {
         gpio_bit_set(BMS_AFE_DFETOFF_GPIO_PORT, BMS_AFE_DFETOFF_PIN);
-        Afe_Delay_Ms(2U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(2U);
         ok = Gd30_Subcommand_Data_Write(GD30BM2016_CMD_FET_CONTROL,
                                         GD30BM2016_FET_CONTROL_ALL_OFF,
                                         1U);
         if(ok != 0U) {
-            Afe_Delay_Ms(1U);
+            Afe_Gd30bm2016_Transport_Delay_Ms(1U);
             (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_CHG_PCHG_OFF);
-            Afe_Delay_Ms(1U);
+            Afe_Gd30bm2016_Transport_Delay_Ms(1U);
             (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_DSG_PDSG_OFF);
-            Afe_Delay_Ms(1U);
+            Afe_Gd30bm2016_Transport_Delay_Ms(1U);
             (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_ALL_FETS_OFF);
         }
     }
 
-    Afe_Delay_Ms(10U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(10U);
     if((ok != 0U) && (status != 0)) {
         ok = Gd30_Read_Fet_Status_Combined(status, 0);
         if(ok != 0U) {
@@ -1511,28 +1220,28 @@ static uint8_t Gd30_Apply_Preconnect_Test_Fet_Mask(uint8_t fet_mask, uint8_t *st
     fet_mask &= GD30BM2016_PRECONNECT_FET_MASK;
 
     gpio_bit_reset(BMS_AFE_DFETOFF_GPIO_PORT, BMS_AFE_DFETOFF_PIN);
-    Afe_Delay_Ms(2U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(2U);
 
     ok = Gd30_Set_Normal_Fet_Control(0U);
     if(ok != 0U) {
         ok = Gd30_Subcommand_Data_Write(GD30BM2016_CMD_FET_CONTROL, 0U, 1U);
     }
     if(ok != 0U) {
-        Afe_Delay_Ms(1U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(1U);
         ok = Gd30_Subcommand_Only(GD30BM2016_SUBCMD_ALL_FETS_OFF);
     }
     if((ok != 0U) &&
        ((fet_mask & AFE_GD30BM2016_FET_STATUS_PCHG) != 0U)) {
-        Afe_Delay_Ms(1U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(1U);
         ok = Gd30_Subcommand_Only(GD30BM2016_SUBCMD_PCHGTEST);
     }
     if((ok != 0U) &&
        ((fet_mask & AFE_GD30BM2016_FET_STATUS_PDSG) != 0U)) {
-        Afe_Delay_Ms(1U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(1U);
         ok = Gd30_Subcommand_Only(GD30BM2016_SUBCMD_PDSGTEST);
     }
 
-    Afe_Delay_Ms(10U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(10U);
     if((ok != 0U) && (status != 0)) {
         ok = Gd30_Read_Fet_Status_Combined(status, 0);
         if(ok != 0U) {
@@ -1545,27 +1254,27 @@ static uint8_t Gd30_Apply_Preconnect_Test_Fet_Mask(uint8_t fet_mask, uint8_t *st
 
 static uint8_t Gd30_Read_Snapshot(bms_afe_data_t *data, uint32_t *fault_bitmap)
 {
-    if(0U == Gd30_I2c_Lock(portMAX_DELAY)) {
+    if(0U == Afe_Gd30bm2016_Transport_Lock(portMAX_DELAY)) {
         return 0U;
     }
 
     if(0U == Gd30_Read_Cells(data)) {
         s_i2c_ready = 0U;
-        Gd30_I2c_Unlock();
+        Afe_Gd30bm2016_Transport_Unlock();
         return 0U;
     }
 
     (void)Gd30_Read_Stack_Voltage(data);
     if(0U == Gd30_Read_Battery_Current(data)) {
         s_i2c_ready = 0U;
-        Gd30_I2c_Unlock();
+        Afe_Gd30bm2016_Transport_Unlock();
         return 0U;
     }
     Gd30_Update_Top_Cell_Estimate(data);
     (void)Gd30_Read_Temperatures(data);
     (void)Gd30_Read_Fault_Bitmap(fault_bitmap);
     Afe_Update_Min_Max(data);
-    Gd30_I2c_Unlock();
+    Afe_Gd30bm2016_Transport_Unlock();
 
     return 1U;
 }
@@ -1584,12 +1293,12 @@ static uint8_t Gd30_Recover_If_Due(void)
     }
     s_last_recover_tick = now;
 
-    if(0U == Gd30_I2c_Lock(0U)) {
+    if(0U == Afe_Gd30bm2016_Transport_Lock(0U)) {
         return 0U;
     }
 
     s_i2c_ready = Gd30_Start_I2c_Link();
-    Gd30_I2c_Unlock();
+    Afe_Gd30bm2016_Transport_Unlock();
 
     return s_i2c_ready;
 }
@@ -1598,10 +1307,7 @@ void Afe_Gd30bm2016_Init(void)
 {
     s_balance_bitmap = 0U;
     s_i2c_addr_write = GD30BM2016_I2C_ADDR_WRITE;
-    if(s_i2c_mutex == 0) {
-        s_i2c_mutex = xSemaphoreCreateMutex();
-        configASSERT(s_i2c_mutex != 0);
-    }
+    Afe_Gd30bm2016_Transport_Init();
 
     s_i2c_ready = 0U;
     s_last_recover_tick = (TickType_t)(0U - pdMS_TO_TICKS(AFE_RECOVER_PERIOD_MS));
@@ -1647,11 +1353,11 @@ void Afe_Gd30bm2016_Set_Balance(uint16_t balance_bitmap)
 #if GD30BM2016_BALANCE_REGISTER_VALID
     hw_balance_bitmap = Gd30_Balance_Logical_To_Hw(s_balance_bitmap);
     if(s_i2c_ready != 0U) {
-        if(0U != Gd30_I2c_Lock(portMAX_DELAY)) {
+        if(0U != Afe_Gd30bm2016_Transport_Lock(portMAX_DELAY)) {
             (void)Gd30_Subcommand_Data_Write(GD30BM2016_CMD_CELL_BALANCING_ACTIVE_CELLS,
                                              hw_balance_bitmap,
                                              2U);
-            Gd30_I2c_Unlock();
+            Afe_Gd30bm2016_Transport_Unlock();
         }
     }
 #endif
@@ -1667,9 +1373,9 @@ void Afe_Gd30bm2016_Fets_Off(void)
     Afe_Gd30bm2016_Force_Path_Off_Fast();
 
     if(s_i2c_ready != 0U) {
-        if(0U != Gd30_I2c_Lock(portMAX_DELAY)) {
+        if(0U != Afe_Gd30bm2016_Transport_Lock(portMAX_DELAY)) {
             (void)Gd30_Apply_Normal_Fets_Off(0);
-            Gd30_I2c_Unlock();
+            Afe_Gd30bm2016_Transport_Unlock();
         }
     }
 }
@@ -1683,13 +1389,13 @@ uint8_t Afe_Gd30bm2016_Fets_On(uint8_t *status)
         *status = 0U;
     }
     if(s_i2c_ready != 0U) {
-        if(0U != Gd30_I2c_Lock(portMAX_DELAY)) {
+        if(0U != Afe_Gd30bm2016_Transport_Lock(portMAX_DELAY)) {
             (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_OCDL_RECOVER);
-            Afe_Delay_Ms(2U);
+            Afe_Gd30bm2016_Transport_Delay_Ms(2U);
             (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_SCDL_RECOVER);
-            Afe_Delay_Ms(2U);
+            Afe_Gd30bm2016_Transport_Delay_Ms(2U);
             ok = Gd30_Apply_Normal_Fets_On(&fet_status);
-            Gd30_I2c_Unlock();
+            Afe_Gd30bm2016_Transport_Unlock();
             if(status != 0) {
                 *status = fet_status;
             }
@@ -1709,16 +1415,16 @@ uint8_t Afe_Gd30bm2016_Recover_Protections(void)
     if(s_i2c_ready == 0U) {
         return 0U;
     }
-    if(0U == Gd30_I2c_Lock(portMAX_DELAY)) {
+    if(0U == Afe_Gd30bm2016_Transport_Lock(portMAX_DELAY)) {
         return 0U;
     }
 
     ok = 1U;
     ok &= Gd30_Subcommand_Only(GD30BM2016_SUBCMD_OCDL_RECOVER);
-    Afe_Delay_Ms(2U);
+    Afe_Gd30bm2016_Transport_Delay_Ms(2U);
     ok &= Gd30_Subcommand_Only(GD30BM2016_SUBCMD_SCDL_RECOVER);
-    Afe_Delay_Ms(2U);
-    Gd30_I2c_Unlock();
+    Afe_Gd30bm2016_Transport_Delay_Ms(2U);
+    Afe_Gd30bm2016_Transport_Unlock();
 
     return ok;
 }
@@ -1734,7 +1440,7 @@ uint8_t Afe_Gd30bm2016_Set_Fet_Mask(uint8_t fet_mask, uint8_t *status)
         }
         return 0U;
     }
-    if(0U == Gd30_I2c_Lock(portMAX_DELAY)) {
+    if(0U == Afe_Gd30bm2016_Transport_Lock(portMAX_DELAY)) {
         if(status != 0) {
             *status = 0U;
         }
@@ -1744,9 +1450,9 @@ uint8_t Afe_Gd30bm2016_Set_Fet_Mask(uint8_t fet_mask, uint8_t *status)
     requested_mask = (uint8_t)(fet_mask & GD30BM2016_FET_STATUS_OUTPUT_MASK);
     if(requested_mask != 0U) {
         (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_OCDL_RECOVER);
-        Afe_Delay_Ms(2U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(2U);
         (void)Gd30_Subcommand_Only(GD30BM2016_SUBCMD_SCDL_RECOVER);
-        Afe_Delay_Ms(2U);
+        Afe_Gd30bm2016_Transport_Delay_Ms(2U);
     }
     if((requested_mask != 0U) &&
        ((requested_mask & (uint8_t)~GD30BM2016_PRECONNECT_FET_MASK) == 0U)) {
@@ -1754,7 +1460,7 @@ uint8_t Afe_Gd30bm2016_Set_Fet_Mask(uint8_t fet_mask, uint8_t *status)
     } else {
         ok = Gd30_Apply_Normal_Fet_Mask(requested_mask, status);
     }
-    Gd30_I2c_Unlock();
+    Afe_Gd30bm2016_Transport_Unlock();
     return ok;
 }
 
@@ -1768,15 +1474,15 @@ uint8_t Afe_Gd30bm2016_Read_Fet_Status(uint8_t *status)
     if(s_i2c_ready == 0U) {
         return 0U;
     }
-    if(0U == Gd30_I2c_Lock(portMAX_DELAY)) {
+    if(0U == Afe_Gd30bm2016_Transport_Lock(portMAX_DELAY)) {
         return 0U;
     }
     if(0U == Gd30_Read_Fet_Status_Combined(status, 0)) {
-        Gd30_I2c_Unlock();
+        Afe_Gd30bm2016_Transport_Unlock();
         return 0U;
     }
 
-    Gd30_I2c_Unlock();
+    Afe_Gd30bm2016_Transport_Unlock();
     return 1U;
 }
 
@@ -1808,13 +1514,13 @@ void Afe_Gd30bm2016_Get_Debug(afe_gd30bm2016_debug_t *debug)
 
     saved_fail_step = g_afe_gd30_config_fail_step;
     saved_fail_reg = g_afe_gd30_config_fail_reg;
-    if((s_i2c_ready != 0U) && (0U != Gd30_I2c_Lock(portMAX_DELAY))) {
+    if((s_i2c_ready != 0U) && (0U != Afe_Gd30bm2016_Transport_Lock(portMAX_DELAY))) {
         (void)Gd30_Direct_Read(GD30BM2016_DIR_SAFETY_STATUS_A, &debug->safetyStatusA, 1U);
         (void)Gd30_Direct_Read(GD30BM2016_DIR_SAFETY_STATUS_B, &debug->safetyStatusB, 1U);
         (void)Gd30_Direct_Read(GD30BM2016_DIR_SAFETY_STATUS_C, &debug->safetyStatusC, 1U);
         (void)Gd30_Read_Manufacturing_Status(&debug->manufacturingStatus);
         (void)Gd30_Data_Memory_Read(GD30BM2016_DM_FET_OPTIONS, &debug->fetOptions, 1U);
-        Gd30_I2c_Unlock();
+        Afe_Gd30bm2016_Transport_Unlock();
         g_afe_gd30_config_fail_step = saved_fail_step;
         g_afe_gd30_config_fail_reg = saved_fail_reg;
     }
@@ -1838,7 +1544,7 @@ uint8_t Afe_Gd30bm2016_Read_Path_Voltages(uint16_t *stack_mv, uint16_t *pack_mv,
     if(s_i2c_ready == 0U) {
         return 0U;
     }
-    if(0U == Gd30_I2c_Lock(portMAX_DELAY)) {
+    if(0U == Afe_Gd30bm2016_Transport_Lock(portMAX_DELAY)) {
         return 0U;
     }
 
@@ -1852,7 +1558,7 @@ uint8_t Afe_Gd30bm2016_Read_Path_Voltages(uint16_t *stack_mv, uint16_t *pack_mv,
         *ld_mv = (uint16_t)(raw_ld * GD30BM2016_STACK_PACK_LD_LSB_MV);
     }
 
-    Gd30_I2c_Unlock();
+    Afe_Gd30bm2016_Transport_Unlock();
     return ok;
 }
 
